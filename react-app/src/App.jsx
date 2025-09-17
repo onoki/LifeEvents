@@ -10,7 +10,7 @@ import { Loader2 } from 'lucide-react'
 
 function App() {
   const [sheetsUrl, setSheetsUrl] = useState('')
-  const { data, config, loading, error, loadData, status, eunlData, fetchEUNLData } = useData()
+  const { data, config, conditions, loading, error, loadData, status, eunlData, fetchEUNLData } = useData()
 
   // Load URL from GET parameter on component mount
   useEffect(() => {
@@ -71,12 +71,13 @@ function App() {
         {data && data.length > 0 && (
           <>
             {/* KPI Cards */}
-            <KPICards data={data} config={config} />
+            <KPICards data={data} config={config} conditions={conditions} />
             
             {/* Stock Charts */}
             <StockCharts 
               data={data} 
               config={config} 
+              conditions={conditions}
               eunlData={eunlData} 
               onFetchEUNL={handleFetchEUNL}
               loading={loading}

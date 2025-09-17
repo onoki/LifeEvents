@@ -3,6 +3,7 @@ import { useState } from 'react'
 export function useData() {
   const [data, setData] = useState([])
   const [config, setConfig] = useState({})
+  const [conditions, setConditions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [status, setStatus] = useState('')
@@ -13,6 +14,7 @@ export function useData() {
     
     // Parse configuration parameters (first few lines)
     const configData = {}
+    let conditionsStartIndex = 0
     let dataStartIndex = 0
     
     // Look for config lines first
@@ -23,11 +25,14 @@ export function useData() {
         const parts = line.split('\t')
         
         // Check if this looks like a config line (key-value pair)
-        if (parts.length === 2 && !line.match(/^\d{4}-\d{2}-\d{2}/)) {
+        if (parts.length === 2 && !line.match(/^\d{4}-\d{2}-\d{2}/) && !line.includes('condition')) {
           const key = parts[0].trim()
           const value = parts[1].trim()
           configData[key] = value
-          dataStartIndex = i + 1
+          // Don't set conditionsStartIndex here, let it be found naturally
+        } else if (line.includes('condition') && line.includes('explanation_short') && line.includes('explanation_long')) {
+          // Found conditions header
+          conditionsStartIndex = i
         } else if (line.match(/^\d{4}-\d{2}-\d{2}/)) {
           // Found first date line, this is where data starts
           dataStartIndex = i
@@ -36,11 +41,34 @@ export function useData() {
       }
     }
     
+    // Parse conditions section
+    const conditionsData = []
+    
+    if (conditionsStartIndex > 0 && dataStartIndex > conditionsStartIndex) {
+      const conditionsLines = lines.slice(conditionsStartIndex, dataStartIndex - 1)
+      
+      const conditionsHeaders = conditionsLines[0].split('\t').map(h => h.trim())
+      
+      for (let i = 1; i < conditionsLines.length; i++) {
+        const line = conditionsLines[i].trim()
+        if (line) {
+          const values = line.split('\t').map(v => v.trim())
+          const condition = {}
+          
+          conditionsHeaders.forEach((header, headerIndex) => {
+            condition[header] = values[headerIndex] || ''
+          })
+          
+          conditionsData.push(condition)
+        }
+      }
+    }
+    
     // Parse the actual data starting from the date header
     const dataLines = lines.slice(dataStartIndex - 1)
     
     if (dataLines.length === 0) {
-      return { config: configData, data: [] }
+      return { config: configData, conditions: conditionsData, data: [] }
     }
     
     const headers = dataLines[0].split('\t').map(h => h.trim())
@@ -57,7 +85,7 @@ export function useData() {
       return processEventData(event)
     }).filter(event => event.date) // Filter out invalid entries
     
-    return { config: configData, data: parsedData }
+    return { config: configData, conditions: conditionsData, data: parsedData }
   }
 
   const processEventData = (event) => {
@@ -158,15 +186,16 @@ export function useData() {
       }
 
       const tsvData = await response.text()
-      const { config: parsedConfig, data: parsedData } = parseTSVData(tsvData)
+      const { config: parsedConfig, conditions: parsedConditions, data: parsedData } = parseTSVData(tsvData)
       
       if (parsedData.length === 0) {
         throw new Error('No data found in the sheet')
       }
 
       setConfig(parsedConfig)
+      setConditions(parsedConditions)
       setData(parsedData)
-      setStatus(`Loaded ${parsedData.length} events successfully`)
+      setStatus(`Loaded ${parsedData.length} events and ${parsedConditions.length} conditions successfully`)
       
     } catch (err) {
       console.error('Error loading data:', err)
@@ -180,6 +209,7 @@ export function useData() {
   return {
     data,
     config,
+    conditions,
     loading,
     error,
     status,
