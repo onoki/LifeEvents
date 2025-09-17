@@ -1,0 +1,80 @@
+import React, { useState } from 'react';
+import { ViewModeToggle } from './ViewModeToggle';
+import { StockChart } from './StockChart';
+import { MinRequiredContributionsChart } from './MinRequiredContributionsChart';
+import { EUNLChart } from './EUNLChart';
+import { ConditionsTable } from './ConditionsTable';
+import { useFinancialCalculations } from '../../hooks/useFinancialCalculations';
+import type { StockChartsProps, ViewMode } from '../../types';
+
+/**
+ * Stock Charts Container Component
+ * Displays stock-related charts with view mode controls
+ */
+export function StockCharts({ 
+  data, 
+  config, 
+  conditions, 
+  eunlData, 
+  onFetchEUNL, 
+  loading 
+}: StockChartsProps): JSX.Element {
+  const [viewMode, setViewMode] = useState<ViewMode>('recorded');
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="text-center py-8 text-muted-foreground">
+          No stock data available
+        </div>
+      </div>
+    );
+  }
+
+  const {
+    fullChartData,
+    filteredData,
+    eunlChartData,
+    milestoneMarkers
+  } = useFinancialCalculations(data, config, conditions, eunlData, viewMode);
+
+  return (
+    <div className="space-y-6">
+      {/* View Mode Toggle Control */}
+      <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+
+      {/* Owned stocks chart - full width */}
+      <div className="mb-8">
+        <StockChart 
+          title="Owned stocks" 
+          data={fullChartData.filter(item => filteredData.some(filteredItem => filteredItem.date.getTime() === item.date.getTime()))}
+          dataKey="stocks_in_eur"
+          config={config}
+          conditions={conditions}
+        />
+        
+        {/* Conditions table below the chart */}
+        <ConditionsTable conditions={conditions} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Minimum Required Contributions Chart */}
+        <MinRequiredContributionsChart 
+          title="Minimum required monthly contributions to reach the goal" 
+          data={fullChartData.filter(item => filteredData.some(filteredItem => filteredItem.date.getTime() === item.date.getTime()))}
+          config={config}
+        />
+        
+        <EUNLChart 
+          title="EUNL ETF history" 
+          data={eunlChartData}
+          onFetchEUNL={onFetchEUNL}
+          loading={loading}
+          showOnlyDataWithStocks={viewMode === 'recorded'}
+          stocksData={filteredData}
+          viewMode={viewMode}
+        />
+      </div>
+    </div>
+  );
+}
