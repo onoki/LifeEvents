@@ -6,7 +6,7 @@ import { Label } from "@/components/UI/label"
 import { KPICards } from './components/KPI/KPICards'
 import { StockCharts } from './components/Charts/StockCharts'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { useAppStore } from './store/useAppStore'
+import { useAppStore } from './store/use-app-store'
 import { Loader2 } from 'lucide-react'
 import { APP_CONFIG } from './config/app-config'
 import './styles/accessibility.css'

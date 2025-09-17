@@ -27,6 +27,7 @@ export function MinRequiredContributionsChart({ title, data, config }: MinRequir
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => formatCurrency(value)}
             domain={[(dataMin) => Math.min(dataMin, 0), 'dataMax']}
+            orientation="right"
           />
           <Tooltip 
             contentStyle={{

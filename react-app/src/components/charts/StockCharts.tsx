@@ -19,7 +19,7 @@ export function StockCharts({
   onFetchEUNL, 
   loading 
 }: StockChartsProps): JSX.Element {
-  const [viewMode, setViewMode] = useState<ViewMode>('recorded');
+  const [viewMode, setViewMode] = useState<ViewMode>('next2years');
 
   if (!data || data.length === 0) {
     return (

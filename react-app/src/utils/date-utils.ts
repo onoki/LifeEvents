@@ -120,7 +120,7 @@ export function getWorkTimeFormatted(currentTime: Date): string {
   
   // If it's weekend, show 0
   if (now.getDay() === 0 || now.getDay() === 6) {
-    return "0 h 0 min";
+    return "0 min";
   }
   
   const workEnd = new Date(now);
@@ -129,7 +129,7 @@ export function getWorkTimeFormatted(currentTime: Date): string {
   // If it's already past work end, show 0
   if (now.getHours() > APP_CONFIG.WORK_SCHEDULE.END_HOUR || 
       (now.getHours() === APP_CONFIG.WORK_SCHEDULE.END_HOUR && now.getMinutes() >= APP_CONFIG.WORK_SCHEDULE.END_MINUTE)) {
-    return "0 h 0 min";
+    return "0 min";
   }
   
   const diffMs = workEnd.getTime() - now.getTime();
@@ -138,8 +138,10 @@ export function getWorkTimeFormatted(currentTime: Date): string {
   
   if (diffHours > 0) {
     return `${diffHours} h ${diffMinutes} min`;
-  } else {
+  } else if (diffMinutes > 0) {
     return `${diffMinutes} min`;
+  } else {
+    return "0 min";
   }
 }
 

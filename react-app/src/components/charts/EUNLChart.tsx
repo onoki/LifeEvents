@@ -113,6 +113,7 @@ export function EUNLChart({
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => formatCurrency(value)}
             domain={['dataMin', 'dataMax']}
+            orientation="right"
           />
           <Tooltip 
             contentStyle={{
