@@ -1,6 +1,9 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts'
+import { useState } from 'react'
 
 export function StockCharts({ data, config }) {
+  const [showOnlyDataWithStocks, setShowOnlyDataWithStocks] = useState(false)
+
   if (!data || data.length === 0) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -11,37 +14,71 @@ export function StockCharts({ data, config }) {
     )
   }
 
-  const stocksData = processStocksData(data)
+  // Always calculate with full data range for consistent target lines
+  const fullChartData = calculateTargetWithFixedContribution(data, config)
+  const fullStocksData = processStocksData(data)
+  
+  // Filter data based on toggle state (only for display)
+  const filteredData = showOnlyDataWithStocks 
+    ? data.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur) > 0)
+    : data
+
+  const stocksData = processStocksData(filteredData)
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      <StockChart 
-        title="Owned Stocks" 
-        data={data}
-        dataKey="stocks_in_eur"
-        description="Complex line chart showing your stock portfolio value over time"
-        config={config}
-      />
-      
-      <EUNLChart 
-        title="EUNL History" 
-        data={stocksData}
-        description="Simpler line chart showing EUNL ETF performance"
-      />
-      
-      {/* Minimum Required Contributions Chart */}
-      <MinRequiredContributionsChart 
-        title="Minimum Required Monthly Contributions" 
-        data={data}
-        config={config}
-        description="Monthly contribution needed to reach investment goal"
-      />
+    <div className="space-y-6">
+      {/* Toggle Control */}
+      <div className="flex items-center justify-center">
+        <div className="bg-card border rounded-lg p-4">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-medium">Show all data</span>
+            <button
+              onClick={() => setShowOnlyDataWithStocks(!showOnlyDataWithStocks)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                showOnlyDataWithStocks ? 'bg-blue-600' : 'bg-gray-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  showOnlyDataWithStocks ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <span className="text-sm font-medium">Show only months with stock data</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <StockChart 
+          title="Owned Stocks" 
+          data={showOnlyDataWithStocks ? fullChartData.filter(item => item.stocks_in_eur !== null) : fullChartData}
+          dataKey="stocks_in_eur"
+          description="Complex line chart showing your stock portfolio value over time"
+          config={config}
+        />
+        
+        <EUNLChart 
+          title="EUNL History" 
+          data={stocksData}
+          description="Simpler line chart showing EUNL ETF performance"
+        />
+        
+        {/* Minimum Required Contributions Chart */}
+        <MinRequiredContributionsChart 
+          title="Minimum Required Monthly Contributions" 
+          data={showOnlyDataWithStocks ? fullChartData.filter(item => item.stocks_in_eur !== null) : fullChartData}
+          config={config}
+          description="Monthly contribution needed to reach investment goal"
+        />
+      </div>
     </div>
   )
 }
 
 function StockChart({ title, data, dataKey, description, config }) {
-  const chartData = calculateTargetWithFixedContribution(data, config)
+  // Data is already calculated with full range, just use it directly
+  const chartData = data
   
   return (
     <div className="bg-card border rounded-lg p-6">
@@ -50,7 +87,7 @@ function StockChart({ title, data, dataKey, description, config }) {
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={chartData}>
+        <ComposedChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="dateFormatted"
@@ -62,6 +99,7 @@ function StockChart({ title, data, dataKey, description, config }) {
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => `€${value}`}
             label={{ value: 'Portfolio Value (€)', angle: -90, position: 'insideLeft' }}
+            domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
           />
           <Tooltip 
             contentStyle={{
@@ -72,10 +110,14 @@ function StockChart({ title, data, dataKey, description, config }) {
               color: 'hsl(var(--popover-foreground))'
             }}
             formatter={(value, name) => {
-              const label = name === 'stocks_in_eur' ? 'Current Value' : 
+              const annualGrowthRate = parseFloat(config.annual_growth_rate)
+              const label = name === 'stocks_in_eur' ? 'Current Stocks' : 
                            name === 'targetWithFixedContribution' ? 'Target with Fixed Contribution' :
-                           'New Line Value'
-              return [`€${value}`, label]
+                           name === 'targetWithMinimumContribution' ? 'Target with Minimum Contribution' :
+                           name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % Growth Scenario` :
+                           name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % Growth Scenario` :
+                           'Unknown'
+              return [`€${Math.round(value)}`, label]
             }}
           />
           {/* Line 1: Target with fixed contribution */}
@@ -83,31 +125,53 @@ function StockChart({ title, data, dataKey, description, config }) {
             type="monotone" 
             dataKey="targetWithFixedContribution"
             stroke="#ef4444" 
-            strokeWidth={1.5}
+            strokeWidth={1}
             strokeDasharray="5 5"
             dot={{ fill: '#ef4444', strokeWidth: 1, r: 2 }}
             activeDot={{ r: 4, fill: '#dc2626' }}
           />
-          {/* Line 2: New line value */}
+          {/* Line 4: (annual_growth_rate - 1%) scenario */}
           <Line 
             type="monotone" 
-            dataKey="newLineValue"
+            dataKey="lineWithMinusOnePercentGrowth"
+            stroke="#10b981" 
+            strokeWidth={1}
+            strokeDasharray="3 3"
+            dot={{ fill: '#10b981', strokeWidth: 1, r: 2 }}
+            activeDot={{ r: 4, fill: '#059669' }}
+          />
+          {/* Line 5: (annual_growth_rate + 1%) scenario */}
+          <Line 
+            type="monotone" 
+            dataKey="lineWithPlusOnePercentGrowth"
+            stroke="#f59e0b" 
+            strokeWidth={1}
+            strokeDasharray="4 2"
+            dot={{ fill: '#f59e0b', strokeWidth: 1, r: 2 }}
+            activeDot={{ r: 4, fill: '#d97706' }}
+          />
+          {/* Line 2: Target with minimum contribution */}
+          <Line 
+            type="monotone" 
+            dataKey="targetWithMinimumContribution"
             stroke="#8b5cf6" 
-            strokeWidth={1.5}
+            strokeWidth={1}
             strokeDasharray="2 2"
             dot={{ fill: '#8b5cf6', strokeWidth: 1, r: 2 }}
             activeDot={{ r: 4, fill: '#7c3aed' }}
           />
-          {/* Line 3: Current stocks value */}
-          <Line 
+          {/* Line 3: Current stocks value - Area series */}
+          <Area 
             type="monotone" 
             dataKey={dataKey}
             stroke="#3b82f6" 
+            fill="#3b82f6"
+            fillOpacity={0.3}
             strokeWidth={2}
             dot={{ fill: '#3b82f6', strokeWidth: 1.5, r: 3 }}
             activeDot={{ r: 5, fill: '#1d4ed8' }}
           />
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   )
@@ -133,6 +197,7 @@ function EUNLChart({ title, data, description }) {
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => `€${value}`}
+            domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
           />
           <Tooltip 
             contentStyle={{
@@ -142,7 +207,7 @@ function EUNLChart({ title, data, description }) {
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value) => [`€${value}`, 'EUNL Value']}
+            formatter={(value) => [`€${Math.round(value)}`, 'EUNL Value']}
           />
           <Line 
             type="monotone" 
@@ -159,7 +224,8 @@ function EUNLChart({ title, data, description }) {
 }
 
 function MinRequiredContributionsChart({ title, data, config, description }) {
-  const chartData = calculateTargetWithFixedContribution(data, config)
+  // Data is already calculated with full range, just use it directly
+  const chartData = data
   
   return (
     <div className="bg-card border rounded-lg p-6">
@@ -180,6 +246,7 @@ function MinRequiredContributionsChart({ title, data, config, description }) {
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => `€${value}`}
             label={{ value: 'Monthly Contribution (€)', angle: -90, position: 'insideLeft' }}
+            domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
           />
           <Tooltip 
             contentStyle={{
@@ -189,7 +256,7 @@ function MinRequiredContributionsChart({ title, data, config, description }) {
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value) => [`€${value}`, 'Min Required Contribution']}
+            formatter={(value) => [`€${Math.round(value)}`, 'Min Required Contribution']}
           />
           <Line 
             type="monotone" 
@@ -274,9 +341,11 @@ function calculateTargetWithFixedContribution(data, config) {
   }
   
   // Process the raw data and add target calculations
-  let previousNewLineValue = 0
-  
-  return sortedData.map((item, index) => {
+  let previousMinContributionLineValue = 0
+  let previousMinusOnePercentValue = 0
+  let previousPlusOnePercentValue = 0
+
+  const result = sortedData.map((item, index) => {
     const monthsFromStart = (item.date.getFullYear() - firstDate.getFullYear()) * 12 + 
                            (item.date.getMonth() - firstDate.getMonth())
     
@@ -298,27 +367,42 @@ function calculateTargetWithFixedContribution(data, config) {
       } else if (monthsRemaining > 0) {
         minRequiredContribution = remainingToAchieve / monthsRemaining
       }
-      minRequiredContribution = Math.max(0, minRequiredContribution)
+        minRequiredContribution = Math.max(0, minRequiredContribution)
+        latestMinRequiredContribution = minRequiredContribution
     } else {
       // For future points (after latest known data point), use the same value as latest
       minRequiredContribution = latestMinRequiredContribution
     }
     
-    // Calculate new line value
-    let newLineValue = 0
+    // Calculate minimum contribution line value
+    let targetWithMinimumContribution = null
     if (item.stocks_in_eur) {
-      // Rule 1: if there is a "stocks_in_eur" value for a given month
-      const currentStocksValue = parseFloat(item.stocks_in_eur)
-      newLineValue = (currentStocksValue + latestMinRequiredContribution) * (1 + monthlyGrowthRate)
+      // Rule 1: if there is a "stocks_in_eur" value for a given month - don't show this line
+      targetWithMinimumContribution = null
     } else {
       // Rule 2: if there is no "stocks_in_eur" value for a given month
-      newLineValue = previousNewLineValue * (1 + monthlyGrowthRate) + latestMinRequiredContribution
+      targetWithMinimumContribution = previousMinContributionLineValue * (1 + monthlyGrowthRate) + latestMinRequiredContribution
     }
     
-    // Update previous value for next iteration
-    previousNewLineValue = newLineValue
+    // Calculate alternative growth scenarios (annual_growth_rate ± 1%)
+    const monthlyGrowthRateMinusOne = (annualGrowthRate - 0.01) / 12
+    const monthlyGrowthRatePlusOne = (annualGrowthRate + 0.01) / 12
     
-    return {
+    let lineWithMinusOnePercentGrowth = null
+    let lineWithPlusOnePercentGrowth = null
+    
+    if (item.stocks_in_eur) {
+      // Don't show these lines when there's actual stocks data
+      lineWithMinusOnePercentGrowth = null
+      lineWithPlusOnePercentGrowth = null
+    } else {
+      // Calculate with (annual_growth_rate - 1%) using its own previous value
+      lineWithMinusOnePercentGrowth = previousMinusOnePercentValue * (1 + monthlyGrowthRateMinusOne) + latestMinRequiredContribution
+      // Calculate with (annual_growth_rate + 1%) using its own previous value
+      lineWithPlusOnePercentGrowth = previousPlusOnePercentValue * (1 + monthlyGrowthRatePlusOne) + latestMinRequiredContribution
+    }
+    
+    const resultItem = {
       ...item,
       dateFormatted: item.date.toLocaleDateString('en-US', { 
         month: 'short', 
@@ -327,9 +411,35 @@ function calculateTargetWithFixedContribution(data, config) {
       stocks_in_eur: item.stocks_in_eur ? parseFloat(item.stocks_in_eur) : null,
       targetWithFixedContribution: Math.max(0, targetValue),
       minRequiredContribution: minRequiredContribution,
-      newLineValue: Math.max(0, newLineValue)
+        targetWithMinimumContribution: targetWithMinimumContribution ? Math.max(0, targetWithMinimumContribution) : null,
+        lineWithMinusOnePercentGrowth: lineWithMinusOnePercentGrowth ? Math.max(0, lineWithMinusOnePercentGrowth) : null,
+        lineWithPlusOnePercentGrowth: lineWithPlusOnePercentGrowth ? Math.max(0, lineWithPlusOnePercentGrowth) : null
     }
+
+    // Update previous values for next iteration
+    if (item.stocks_in_eur) {
+      // When we have actual stocks data, reset all previous values to this value
+      const currentStocksValue = parseFloat(item.stocks_in_eur)
+      previousMinContributionLineValue = currentStocksValue
+      previousMinusOnePercentValue = currentStocksValue
+      previousPlusOnePercentValue = currentStocksValue
+    } else {
+      // When we don't have stocks data, update each line's previous value with its own calculated value
+      if (targetWithMinimumContribution !== null) {
+        previousMinContributionLineValue = targetWithMinimumContribution
+      }
+      if (lineWithMinusOnePercentGrowth !== null) {
+        previousMinusOnePercentValue = lineWithMinusOnePercentGrowth
+      }
+      if (lineWithPlusOnePercentGrowth !== null) {
+        previousPlusOnePercentValue = lineWithPlusOnePercentGrowth
+      }
+    }
+    
+    return resultItem
   })
+  
+  return result
 }
 
 // Helper function to process stocks data
