@@ -5,13 +5,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { KPICards } from './components/KPICards'
 import { StockCharts } from './components/StockCharts'
-import { AdvancedCharts } from './components/AdvancedCharts'
 import { useData } from './hooks/useData'
 import { Loader2 } from 'lucide-react'
 
 function App() {
   const [sheetsUrl, setSheetsUrl] = useState('')
-  const { data, config, loading, error, loadData, status } = useData()
+  const { data, config, loading, error, loadData, status, eunlData, fetchEUNLData } = useData()
 
   // Load URL from GET parameter on component mount
   useEffect(() => {
@@ -39,6 +38,10 @@ function App() {
     }
   }
 
+  const handleFetchEUNL = async () => {
+    await fetchEUNLData()
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-6 max-w-6xl">
@@ -63,6 +66,7 @@ function App() {
           </Card>
         )}
 
+
         {/* Dashboard */}
         {data && data.length > 0 && (
           <>
@@ -70,10 +74,13 @@ function App() {
             <KPICards data={data} config={config} />
             
             {/* Stock Charts */}
-            <StockCharts data={data} config={config} />
-            
-            {/* Advanced Charts */}
-            <AdvancedCharts data={data} />
+            <StockCharts 
+              data={data} 
+              config={config} 
+              eunlData={eunlData} 
+              onFetchEUNL={handleFetchEUNL}
+              loading={loading}
+            />
           </>
         )}
 

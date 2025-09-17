@@ -6,6 +6,7 @@ export function useData() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [status, setStatus] = useState('')
+  const [eunlData, setEunlData] = useState([])
 
   const parseTSVData = (tsvText) => {
     const lines = tsvText.trim().split('\n')
@@ -95,6 +96,55 @@ export function useData() {
     return event
   }
 
+  const fetchEUNLData = async () => {
+    setLoading(true)
+    setError(null)
+    setStatus('Fetching EUNL data from Yahoo Finance...')
+
+    try {
+      // Use CORS proxy to access Yahoo Finance API
+      const proxyUrl = 'https://api.allorigins.win/raw?url='
+      const yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/EUNL.DE?period1=1253862000&period2=2546985600&interval=1mo'
+      
+      const response = await fetch(proxyUrl + encodeURIComponent(yahooUrl))
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const yahooData = await response.json()
+      
+      if (!yahooData.chart || !yahooData.chart.result || !yahooData.chart.result[0]) {
+        throw new Error('Invalid data format from Yahoo Finance')
+      }
+
+      const result = yahooData.chart.result[0]
+      const timestamps = result.timestamp
+      const closePrices = result.indicators.quote[0].close
+
+      const eunlData = timestamps.map((timestamp, index) => ({
+        date: new Date(timestamp * 1000),
+        price: closePrices[index] || null,
+        dateFormatted: new Date(timestamp * 1000).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: '2-digit'
+        })
+      })).filter(item => item.price !== null)
+
+
+      setEunlData(eunlData)
+      setStatus(`Loaded ${eunlData.length} EUNL data points successfully`)
+      
+    } catch (err) {
+      console.error('Error loading EUNL data:', err)
+      setError(err.message)
+      setStatus('Error loading EUNL data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const loadData = async (url) => {
     setLoading(true)
     setError(null)
@@ -133,6 +183,8 @@ export function useData() {
     loading,
     error,
     status,
-    loadData
+    loadData,
+    eunlData,
+    fetchEUNLData
   }
 }

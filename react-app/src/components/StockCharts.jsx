@@ -1,8 +1,8 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts'
 import { useState } from 'react'
 
-export function StockCharts({ data, config }) {
-  const [showOnlyDataWithStocks, setShowOnlyDataWithStocks] = useState(false)
+export function StockCharts({ data, config, eunlData = [], onFetchEUNL, loading }) {
+  const [showOnlyDataWithStocks, setShowOnlyDataWithStocks] = useState(true)
 
   if (!data || data.length === 0) {
     return (
@@ -31,52 +31,53 @@ export function StockCharts({ data, config }) {
       <div className="flex items-center justify-center">
         <div className="bg-card border rounded-lg p-4">
           <div className="flex items-center space-x-4">
-            <span className="text-sm font-medium">Show all data</span>
+            <span className="text-sm font-medium">Show only recorded range</span>
             <button
               onClick={() => setShowOnlyDataWithStocks(!showOnlyDataWithStocks)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                showOnlyDataWithStocks ? 'bg-blue-600' : 'bg-gray-600'
+                !showOnlyDataWithStocks ? 'bg-blue-600' : 'bg-gray-600'
               }`}
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  showOnlyDataWithStocks ? 'translate-x-6' : 'translate-x-1'
+                  !showOnlyDataWithStocks ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>
-            <span className="text-sm font-medium">Show only months with stock data</span>
+            <span className="text-sm font-medium">Show full range</span>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <StockChart 
-          title="Owned Stocks" 
+          title="Owned stocks" 
           data={showOnlyDataWithStocks ? fullChartData.filter(item => item.stocks_in_eur !== null) : fullChartData}
           dataKey="stocks_in_eur"
-          description="Complex line chart showing your stock portfolio value over time"
           config={config}
-        />
-        
-        <EUNLChart 
-          title="EUNL History" 
-          data={stocksData}
-          description="Simpler line chart showing EUNL ETF performance"
         />
         
         {/* Minimum Required Contributions Chart */}
         <MinRequiredContributionsChart 
-          title="Minimum Required Monthly Contributions" 
+          title="Minimum required monthly contributions to reach the goal" 
           data={showOnlyDataWithStocks ? fullChartData.filter(item => item.stocks_in_eur !== null) : fullChartData}
           config={config}
-          description="Monthly contribution needed to reach investment goal"
+        />
+        
+        <EUNLChart 
+          title="EUNL history" 
+          data={eunlData}
+          onFetchEUNL={onFetchEUNL}
+          loading={loading}
+          showOnlyDataWithStocks={showOnlyDataWithStocks}
+          stocksData={data}
         />
       </div>
     </div>
   )
 }
 
-function StockChart({ title, data, dataKey, description, config }) {
+function StockChart({ title, data, dataKey, config }) {
   // Data is already calculated with full range, just use it directly
   const chartData = data
   
@@ -84,7 +85,6 @@ function StockChart({ title, data, dataKey, description, config }) {
     <div className="bg-card border rounded-lg p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={chartData}>
@@ -97,9 +97,10 @@ function StockChart({ title, data, dataKey, description, config }) {
           <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => `€${value}`}
-            label={{ value: 'Portfolio Value (€)', angle: -90, position: 'insideLeft' }}
+            tickFormatter={(value) => `€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`}
             domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
+            width={80}
+            orientation="right"
           />
           <Tooltip 
             contentStyle={{
@@ -117,7 +118,7 @@ function StockChart({ title, data, dataKey, description, config }) {
                            name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % Growth Scenario` :
                            name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % Growth Scenario` :
                            'Unknown'
-              return [`€${Math.round(value)}`, label]
+              return [`€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`, label]
             }}
           />
           {/* Line 1: Target with fixed contribution */}
@@ -126,9 +127,8 @@ function StockChart({ title, data, dataKey, description, config }) {
             dataKey="targetWithFixedContribution"
             stroke="#ef4444" 
             strokeWidth={1}
-            strokeDasharray="5 5"
-            dot={{ fill: '#ef4444', strokeWidth: 1, r: 2 }}
-            activeDot={{ r: 4, fill: '#dc2626' }}
+            dot={false}
+            activeDot={{ r: 3, fill: '#dc2626' }}
           />
           {/* Line 4: (annual_growth_rate - 1%) scenario */}
           <Line 
@@ -136,9 +136,8 @@ function StockChart({ title, data, dataKey, description, config }) {
             dataKey="lineWithMinusOnePercentGrowth"
             stroke="#10b981" 
             strokeWidth={1}
-            strokeDasharray="3 3"
-            dot={{ fill: '#10b981', strokeWidth: 1, r: 2 }}
-            activeDot={{ r: 4, fill: '#059669' }}
+            dot={false}
+            activeDot={{ r: 3, fill: '#059669' }}
           />
           {/* Line 5: (annual_growth_rate + 1%) scenario */}
           <Line 
@@ -146,9 +145,8 @@ function StockChart({ title, data, dataKey, description, config }) {
             dataKey="lineWithPlusOnePercentGrowth"
             stroke="#f59e0b" 
             strokeWidth={1}
-            strokeDasharray="4 2"
-            dot={{ fill: '#f59e0b', strokeWidth: 1, r: 2 }}
-            activeDot={{ r: 4, fill: '#d97706' }}
+            dot={false}
+            activeDot={{ r: 3, fill: '#d97706' }}
           />
           {/* Line 2: Target with minimum contribution */}
           <Line 
@@ -156,9 +154,8 @@ function StockChart({ title, data, dataKey, description, config }) {
             dataKey="targetWithMinimumContribution"
             stroke="#8b5cf6" 
             strokeWidth={1}
-            strokeDasharray="2 2"
-            dot={{ fill: '#8b5cf6', strokeWidth: 1, r: 2 }}
-            activeDot={{ r: 4, fill: '#7c3aed' }}
+            dot={false}
+            activeDot={{ r: 3, fill: '#7c3aed' }}
           />
           {/* Line 3: Current stocks value - Area series */}
           <Area 
@@ -167,9 +164,9 @@ function StockChart({ title, data, dataKey, description, config }) {
             stroke="#3b82f6" 
             fill="#3b82f6"
             fillOpacity={0.3}
-            strokeWidth={2}
-            dot={{ fill: '#3b82f6', strokeWidth: 1.5, r: 3 }}
-            activeDot={{ r: 5, fill: '#1d4ed8' }}
+            strokeWidth={1}
+            dot={false}
+            activeDot={{ r: 3, fill: '#1d4ed8' }}
           />
         </ComposedChart>
       </ResponsiveContainer>
@@ -177,27 +174,135 @@ function StockChart({ title, data, dataKey, description, config }) {
   )
 }
 
-function EUNLChart({ title, data, description }) {
-  // For EUNL, we'll show a simpler version - you can customize this
+function EUNLChart({ title, data, onFetchEUNL, loading, showOnlyDataWithStocks, stocksData }) {
+  // Show empty state if no EUNL data
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-card border rounded-lg p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">{title}</h3>
+          </div>
+          {onFetchEUNL && (
+            <button
+              onClick={onFetchEUNL}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              {loading ? 'Fetching...' : 'Fetch EUNL Data'}
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+          <div className="text-center">
+            <div className="text-4xl mb-2">📈</div>
+            <p>No EUNL data loaded</p>
+            <p className="text-sm">Click "Fetch EUNL Data" to load historical data</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Calculate exponential trend line
+  const calculateExponentialTrend = (data) => {
+    if (!data || data.length < 2) return data
+
+    // Convert dates to numeric values (days since first date)
+    const firstDate = data[0].date
+    const numericData = data.map((item, index) => ({
+      ...item,
+      x: (item.date - firstDate) / (1000 * 60 * 60 * 24), // days since first date
+      y: item.price
+    })).filter(item => item.y !== null)
+
+    if (numericData.length < 2) return data
+
+    // Calculate exponential regression: y = a * e^(b * x)
+    // Using linear regression on ln(y) = ln(a) + b * x
+    const n = numericData.length
+    const sumX = numericData.reduce((sum, item) => sum + item.x, 0)
+    const sumY = numericData.reduce((sum, item) => sum + Math.log(item.y), 0)
+    const sumXY = numericData.reduce((sum, item) => sum + item.x * Math.log(item.y), 0)
+    const sumXX = numericData.reduce((sum, item) => sum + item.x * item.x, 0)
+
+    const b = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
+    const lnA = (sumY - b * sumX) / n
+    const a = Math.exp(lnA)
+
+    // Generate trend line data
+    return data.map(item => ({
+      ...item,
+      trend: a * Math.exp(b * ((item.date - firstDate) / (1000 * 60 * 60 * 24)))
+    }))
+  }
+
+  // Calculate trend line from ALL data first (not filtered)
+  const fullChartData = calculateExponentialTrend(data)
+  
+  // Apply toggle filter if needed (only for display)
+  let filteredData = fullChartData
+  
+  if (showOnlyDataWithStocks && data.length > 0) {
+    // If this is EUNL data (has 'price' field), filter by date range of stocks data
+    if (data[0].price !== undefined && stocksData && stocksData.length > 0) {
+      // Get the date range from stocks data that has actual values
+      const stocksWithData = stocksData.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur) > 0)
+      if (stocksWithData.length > 0) {
+        // Get the month boundaries from stocks data
+        const stocksDates = stocksWithData.map(item => item.date)
+        const minDate = new Date(Math.min(...stocksDates.map(date => date.getTime())))
+        const maxDate = new Date(Math.max(...stocksDates.map(date => date.getTime())))
+        
+        // Create month boundaries (start of month for min, end of month for max)
+        const minMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1)
+        const maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0) // Last day of the month
+        
+        // Filter EUNL data to the same month range
+        filteredData = fullChartData.filter(item => {
+          const itemDate = new Date(item.date)
+          return itemDate >= minMonth && itemDate <= maxMonth
+        })
+      }
+    } else if (data[0].stocks_in_eur !== undefined) {
+      // This is stocks data - filter normally
+      filteredData = fullChartData.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur) > 0)
+    }
+  }
+
+  const chartData = filteredData
+
+
   return (
     <div className="bg-card border rounded-lg p-6">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">{title}</h3>
+        </div>
+        {onFetchEUNL && (
+          <button
+            onClick={onFetchEUNL}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            {loading ? 'Fetching...' : 'Fetch EUNL Data'}
+          </button>
+        )}
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data}>
+        <ComposedChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="dateFormatted"
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
+            domain={['dataMin', 'dataMax']}
           />
           <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => `€${value}`}
-            domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
+            tickFormatter={(value) => `€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`}
+            domain={['dataMin', 'dataMax']}
           />
           <Tooltip 
             contentStyle={{
@@ -207,23 +312,33 @@ function EUNLChart({ title, data, description }) {
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value) => [`€${Math.round(value)}`, 'EUNL Value']}
+            formatter={(value, name) => [`€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`, name === 'price' ? 'EUNL Price' : 'Trend Line']}
+          />
+          <Area 
+            type="monotone" 
+            dataKey={data.length > 0 && data[0].price !== undefined ? "price" : "stocks_in_eur"}
+            stroke="#06b6d4" 
+            fill="#06b6d4"
+            fillOpacity={0.3}
+            strokeWidth={1}
+            dot={false}
+            activeDot={{ r: 4, fill: '#06b6d4' }}
           />
           <Line 
             type="monotone" 
-            dataKey="stocks_in_eur"
-            stroke="#06b6d4" 
-            strokeWidth={3}
-            dot={{ fill: '#06b6d4', strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, fill: '#0891b2' }}
+            dataKey="trend"
+            stroke="#ef4444" 
+            strokeWidth={1}
+            dot={false}
+            activeDot={{ r: 4, fill: '#ef4444' }}
           />
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-function MinRequiredContributionsChart({ title, data, config, description }) {
+function MinRequiredContributionsChart({ title, data, config }) {
   // Data is already calculated with full range, just use it directly
   const chartData = data
   
@@ -231,7 +346,6 @@ function MinRequiredContributionsChart({ title, data, config, description }) {
     <div className="bg-card border rounded-lg p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
@@ -244,9 +358,8 @@ function MinRequiredContributionsChart({ title, data, config, description }) {
           <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => `€${value}`}
-            label={{ value: 'Monthly Contribution (€)', angle: -90, position: 'insideLeft' }}
-            domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
+            tickFormatter={(value) => `€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`}
+            domain={[(dataMin) => Math.min(dataMin, 0), 'dataMax']}
           />
           <Tooltip 
             contentStyle={{
@@ -256,16 +369,15 @@ function MinRequiredContributionsChart({ title, data, config, description }) {
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value) => [`€${Math.round(value)}`, 'Min Required Contribution']}
+            formatter={(value) => [`€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`, 'Min Required Contribution']}
           />
           <Line 
             type="monotone" 
             dataKey="minRequiredContribution"
             stroke="#10b981" 
-            strokeWidth={2}
-            strokeDasharray="3 3"
-            dot={{ fill: '#10b981', strokeWidth: 1.5, r: 3 }}
-            activeDot={{ r: 5, fill: '#059669' }}
+            strokeWidth={1}
+            dot={false}
+            activeDot={{ r: 3, fill: '#059669' }}
           />
         </LineChart>
       </ResponsiveContainer>
