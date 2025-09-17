@@ -29,7 +29,7 @@ export function StockCharts({ data, config, eunlData = [], onFetchEUNL, loading 
     <div className="space-y-6">
       {/* Toggle Control */}
       <div className="flex items-center justify-center">
-        <div className="bg-card border rounded-lg p-4">
+        <div className="bg-card border border-gray-600 rounded-lg p-4">
           <div className="flex items-center space-x-4">
             <span className="text-sm font-medium">Show only recorded range</span>
             <button
@@ -65,7 +65,7 @@ export function StockCharts({ data, config, eunlData = [], onFetchEUNL, loading 
         />
         
         <EUNLChart 
-          title="EUNL history" 
+          title="EUNL ETF history" 
           data={eunlData}
           onFetchEUNL={onFetchEUNL}
           loading={loading}
@@ -82,7 +82,7 @@ function StockChart({ title, data, dataKey, config }) {
   const chartData = data
   
   return (
-    <div className="bg-card border rounded-lg p-6">
+    <div className="bg-card border border-gray-600 rounded-lg p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
@@ -97,7 +97,7 @@ function StockChart({ title, data, dataKey, config }) {
           <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => `€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`}
+            tickFormatter={(value) => `${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')} €`}
             domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
             width={80}
             orientation="right"
@@ -112,13 +112,13 @@ function StockChart({ title, data, dataKey, config }) {
             }}
             formatter={(value, name) => {
               const annualGrowthRate = parseFloat(config.annual_growth_rate)
-              const label = name === 'stocks_in_eur' ? 'Current Stocks' : 
-                           name === 'targetWithFixedContribution' ? 'Target with Fixed Contribution' :
-                           name === 'targetWithMinimumContribution' ? 'Target with Minimum Contribution' :
-                           name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % Growth Scenario` :
-                           name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % Growth Scenario` :
+              const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
+                           name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
+                           name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
+                           name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
+                           name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
                            'Unknown'
-              return [`€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`, label]
+              return [`${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')} €`, label]
             }}
           />
           {/* Line 1: Target with fixed contribution */}
@@ -128,34 +128,34 @@ function StockChart({ title, data, dataKey, config }) {
             stroke="#ef4444" 
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#dc2626' }}
+            activeDot={{ r: 3, fill: '#ef4444' }}
           />
           {/* Line 4: (annual_growth_rate - 1%) scenario */}
           <Line 
             type="monotone" 
             dataKey="lineWithMinusOnePercentGrowth"
-            stroke="#10b981" 
+            stroke="#06b6d4" 
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#059669' }}
+            activeDot={{ r: 3, fill: '#06b6d4' }}
           />
           {/* Line 5: (annual_growth_rate + 1%) scenario */}
           <Line 
             type="monotone" 
             dataKey="lineWithPlusOnePercentGrowth"
-            stroke="#f59e0b" 
+            stroke="#06b6d4" 
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#d97706' }}
+            activeDot={{ r: 3, fill: '#06b6d4' }}
           />
           {/* Line 2: Target with minimum contribution */}
           <Line 
             type="monotone" 
             dataKey="targetWithMinimumContribution"
-            stroke="#8b5cf6" 
+            stroke="#10b981" 
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#7c3aed' }}
+            activeDot={{ r: 3, fill: '#10b981' }}
           />
           {/* Line 3: Current stocks value - Area series */}
           <Area 
@@ -166,7 +166,7 @@ function StockChart({ title, data, dataKey, config }) {
             fillOpacity={0.3}
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#1d4ed8' }}
+            activeDot={{ r: 3, fill: '#3b82f6' }}
           />
         </ComposedChart>
       </ResponsiveContainer>
@@ -178,7 +178,7 @@ function EUNLChart({ title, data, onFetchEUNL, loading, showOnlyDataWithStocks, 
   // Show empty state if no EUNL data
   if (!data || data.length === 0) {
     return (
-      <div className="bg-card border rounded-lg p-6">
+      <div className="bg-card border border-gray-600 rounded-lg p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">{title}</h3>
@@ -274,7 +274,7 @@ function EUNLChart({ title, data, onFetchEUNL, loading, showOnlyDataWithStocks, 
 
 
   return (
-    <div className="bg-card border rounded-lg p-6">
+    <div className="bg-card border border-gray-600 rounded-lg p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">{title}</h3>
@@ -301,7 +301,7 @@ function EUNLChart({ title, data, onFetchEUNL, loading, showOnlyDataWithStocks, 
           <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => `€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`}
+            tickFormatter={(value) => `${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')} €`}
             domain={['dataMin', 'dataMax']}
           />
           <Tooltip 
@@ -312,7 +312,7 @@ function EUNLChart({ title, data, onFetchEUNL, loading, showOnlyDataWithStocks, 
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value, name) => [`€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`, name === 'price' ? 'EUNL Price' : 'Trend Line']}
+            formatter={(value, name) => [`${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')} €`, name === 'price' ? 'EUNL price' : 'Trend']}
           />
           <Area 
             type="monotone" 
@@ -343,7 +343,7 @@ function MinRequiredContributionsChart({ title, data, config }) {
   const chartData = data
   
   return (
-    <div className="bg-card border rounded-lg p-6">
+    <div className="bg-card border border-gray-600 rounded-lg p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
@@ -358,7 +358,7 @@ function MinRequiredContributionsChart({ title, data, config }) {
           <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => `€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`}
+            tickFormatter={(value) => `${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')} €`}
             domain={[(dataMin) => Math.min(dataMin, 0), 'dataMax']}
           />
           <Tooltip 
@@ -369,7 +369,7 @@ function MinRequiredContributionsChart({ title, data, config }) {
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value) => [`€${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')}`, 'Min Required Contribution']}
+            formatter={(value) => [`${Math.round(value).toLocaleString('en-US').replace(/,/g, ' ')} €`, 'Minimum required monthly contribution']}
           />
           <Line 
             type="monotone" 
@@ -377,7 +377,7 @@ function MinRequiredContributionsChart({ title, data, config }) {
             stroke="#10b981" 
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#059669' }}
+            activeDot={{ r: 3, fill: '#10b981' }}
           />
         </LineChart>
       </ResponsiveContainer>
