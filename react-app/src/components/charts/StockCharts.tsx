@@ -4,7 +4,7 @@ import { StockChart } from './StockChart';
 import { MinRequiredContributionsChart } from './MinRequiredContributionsChart';
 import { EUNLChart } from './EUNLChart';
 import { ConditionsTable } from './ConditionsTable';
-import { useFinancialCalculations } from '../../hooks/useFinancialCalculations';
+import { useFinancialCalculations } from '../../hooks/use-financial-calculations';
 import type { StockChartsProps, ViewMode } from '../../types';
 
 /**

@@ -53,8 +53,8 @@ src/
 #### Data Management
 - **useAppStore**: Global state management with Zustand
 - **useData**: Data loading and processing
-- **useKPICalculations**: Real-time KPI calculations
-- **useFinancialCalculations**: Financial data processing
+- **use-kpi-calculations**: Real-time KPI calculations
+- **use-financial-calculations**: Financial data processing
 
 ## 🛠️ Technology Stack
 
@@ -129,7 +129,7 @@ date        | event              | category | status    | duration | stocks_in_e
 ```
 
 ### Configuration
-Modify `src/config/appConfig.ts` to customize:
+Modify `src/config/app-config.ts` to customize:
 - Work schedule hours
 - Important dates (family leave, retirement)
 - API endpoints

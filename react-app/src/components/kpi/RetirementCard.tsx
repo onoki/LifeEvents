@@ -1,8 +1,8 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { useKPICalculations } from '../../hooks/useKPICalculations';
-import { formatPercentage } from '../../utils/financialUtils';
-import { APP_CONFIG } from '../../config/appConfig';
+import { Card, CardContent } from '@/components/UI/card';
+import { useKPICalculations } from '../../hooks/use-kpi-calculations';
+import { formatPercentage } from '../../utils/financial-utils';
+import { APP_CONFIG } from '../../config/app-config';
 
 /**
  * Retirement Card Component

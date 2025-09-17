@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { APP_CONFIG } from '../config/appConfig';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/card';
+import { Button } from '@/components/UI/button';
+import { APP_CONFIG } from '../config/app-config';
 
 interface Props {
   children: ReactNode;

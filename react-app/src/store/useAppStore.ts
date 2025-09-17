@@ -59,8 +59,8 @@ export const useAppStore = create<AppState>()(
 
       // Complex actions
       loadData: async (url: string) => {
-        const { APP_CONFIG } = await import('../config/appConfig');
-        const { parseTSVData } = await import('../utils/dataProcessingUtils');
+        const { APP_CONFIG } = await import('../config/app-config');
+        const { parseTSVData } = await import('../utils/data-processing-utils');
         
         set({ loading: true, error: null, status: 'Fetching data from Google Sheets...' });
 
@@ -97,8 +97,8 @@ export const useAppStore = create<AppState>()(
       },
 
       fetchEUNLData: async () => {
-        const { APP_CONFIG } = await import('../config/appConfig');
-        const { calculateExponentialTrend } = await import('../utils/financialUtils');
+        const { APP_CONFIG } = await import('../config/app-config');
+        const { calculateExponentialTrend } = await import('../utils/financial-utils');
         
         set({ loading: true, error: null, status: 'Fetching EUNL data from Yahoo Finance...' });
 

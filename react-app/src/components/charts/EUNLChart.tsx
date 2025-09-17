@@ -1,8 +1,8 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 import type { EUNLChartProps } from '../../types';
-import { formatCurrency } from '../../utils/financialUtils';
-import { APP_CONFIG } from '../../config/appConfig';
+import { formatCurrency } from '../../utils/financial-utils';
+import { APP_CONFIG } from '../../config/app-config';
 
 /**
  * EUNL Chart Component

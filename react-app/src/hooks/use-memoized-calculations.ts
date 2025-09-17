@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useKPICalculations } from './useKPICalculations';
-import { useFinancialCalculations } from './useFinancialCalculations';
+import { useKPICalculations } from './use-kpi-calculations';
+import { useFinancialCalculations } from './use-financial-calculations';
 import type { Event, Config, Condition, EUNLDataPoint, ViewMode } from '../types';
 
 /**

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { KPICards } from './components/kpi/KPICards'
-import { StockCharts } from './components/charts/StockCharts'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/UI/card"
+import { Button } from "@/components/UI/button"
+import { Input } from "@/components/UI/input"
+import { Label } from "@/components/UI/label"
+import { KPICards } from './components/KPI/KPICards'
+import { StockCharts } from './components/Charts/StockCharts'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useAppStore } from './store/useAppStore'
 import { Loader2 } from 'lucide-react'
-import { APP_CONFIG } from './config/appConfig'
+import { APP_CONFIG } from './config/app-config'
 import './styles/accessibility.css'
 
 function App(): JSX.Element {

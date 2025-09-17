@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { calculateTargetWithFixedContribution, processStocksData, calculateExponentialTrend } from '../utils/financialUtils';
-import { filterDataByViewMode, calculateMilestoneMarkers } from '../utils/dataProcessingUtils';
+import { calculateTargetWithFixedContribution, processStocksData, calculateExponentialTrend } from '../utils/financial-utils';
+import { filterDataByViewMode, calculateMilestoneMarkers } from '../utils/data-processing-utils';
 import type { Event, Config, Condition, ChartDataPoint, EUNLDataPoint, ViewMode } from '../types';
 
 export interface FinancialCalculations {

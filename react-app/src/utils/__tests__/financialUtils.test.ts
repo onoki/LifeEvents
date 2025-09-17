@@ -2,10 +2,10 @@ import {
   formatCurrency,
   formatPercentage,
   processStocksData,
-} from '../financialUtils';
+} from '../financial-utils';
 import type { Event } from '../../types';
 
-describe('financialUtils', () => {
+describe('financial-utils', () => {
   describe('formatCurrency', () => {
     it('should format currency values correctly', () => {
       expect(formatCurrency(1000)).toBe('1 000 €');
