@@ -109,9 +109,32 @@ function App(): JSX.Element {
                 <p className="text-muted-foreground mb-4">
                   Enter a Google Sheets URL above to start tracking your KPIs
                 </p>
+                <div className="text-sm text-muted-foreground mb-4 p-3 bg-muted rounded-lg">
+                  <p className="font-medium mb-2">📝 URL Format:</p>
+                  <p className="font-mono text-xs break-all">
+                    {window.location.origin}?sheets=https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit
+                  </p>
+                </div>
                 <div className="text-sm text-muted-foreground">
-                  <p>Your sheet should have columns like:</p>
-                  <p className="font-mono mt-2">date, event, category, status, duration</p>
+                  <p className="font-semibold mb-2">Your Google Sheet should have these sections:</p>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <p className="font-medium">📋 Configuration Section:</p>
+                      <p className="font-mono text-xs ml-2">investment_goal, annual_growth_rate</p>
+                    </div>
+                    
+                    <div>
+                      <p className="font-medium">🎯 Conditions Section:</p>
+                      <p className="font-mono text-xs ml-2">condition, explanation_short, explanation_long</p>
+                    </div>
+                    
+                    <div>
+                      <p className="font-medium">📈 Stock Information Section:</p>
+                      <p className="font-mono text-xs ml-2">date, stocks_in_eur</p>
+                      <p className="text-xs ml-2 text-muted-foreground">Optional: event, category, status, duration</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

@@ -34,7 +34,7 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
   }
   
   return (
-    <div className="bg-card border border-gray-600 rounded-lg p-6">
+    <div className="bg-card border border-gray-600 rounded-lg p-6" style={{ paddingRight: '0px' }}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
@@ -47,11 +47,11 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
             axisLine={{ stroke: 'hsl(var(--border))' }}
           />
           <YAxis 
-            tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => formatCurrency(value)}
+            tickFormatter={(value) => `${Math.round(value / 1000)}k€`}
             domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
-            width={80}
+            width={40}
             orientation="right"
           />
           <Tooltip 

@@ -20,7 +20,7 @@ export function EUNLChart({
   // Show empty state if no EUNL data
   if (!data || data.length === 0) {
     return (
-      <div className="bg-card border border-gray-600 rounded-lg p-6">
+      <div className="bg-card border border-gray-600 rounded-lg p-6" style={{ paddingRight: '0px' }}>
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">{title}</h3>
@@ -84,7 +84,7 @@ export function EUNLChart({
   const chartData = filteredData;
 
   return (
-    <div className="bg-card border border-gray-600 rounded-lg p-6">
+    <div className="bg-card border border-gray-600 rounded-lg p-6" style={{ paddingRight: '0px' }}>
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">{title}</h3>
@@ -100,7 +100,7 @@ export function EUNLChart({
         )}
       </div>
       <ResponsiveContainer width="100%" height={APP_CONFIG.UI.CHART_HEIGHT}>
-        <ComposedChart data={chartData}>
+        <ComposedChart data={chartData} margin={{ left: -10, right: -10, top: 5, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="dateFormatted"

@@ -37,9 +37,9 @@ export function ConditionsTable({ conditions }: ConditionsTableProps): JSX.Eleme
               {conditions.map((condition, index) => (
                 <tr key={index} className="border-b border-gray-600 last:border-b-0">
                   <td className="py-3 px-4 text-sm">
-                    <span className="font-mono bg-gray-800 px-2 py-1 rounded text-xs">
+                    <span className="font-mono bg-gray-800 px-2 py-1 rounded text-xs whitespace-nowrap">
                       {condition.condition ? 
-                        parseFloat(condition.condition).toLocaleString('en-US').replace(/,/g, ' ') + ' €' : 
+                        `${Math.round(parseFloat(condition.condition) / 1000)}k€` : 
                         'N/A'
                       }
                     </span>

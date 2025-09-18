@@ -10,7 +10,7 @@ import { APP_CONFIG } from '../../config/app-config';
  */
 export function MinRequiredContributionsChart({ title, data, config }: MinRequiredContributionsChartProps): JSX.Element {
   return (
-    <div className="bg-card border border-gray-600 rounded-lg p-6">
+    <div className="bg-card border border-gray-600 rounded-lg p-6" style={{ paddingRight: '0px' }}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
