@@ -10,4 +10,5 @@ Write-Output "DuckDNS token: $($ddns_token)"
 ./Update-DuckDNS/Update-DuckDNS.ps1 -Domains $ddns_domains -Token $ddns_token
 
 Write-Output "Docker compose up"
-docker compose -f docker-compose.yml up --build
+# docker compose -f docker-compose.yml up --build
+docker-compose up --build -d
