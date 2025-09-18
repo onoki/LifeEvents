@@ -8,7 +8,7 @@ import { APP_CONFIG } from '../../config/app-config';
  * Retirement Card Component
  * Displays retirement progress and time remaining
  */
-export function RetirementCard(): JSX.Element {
+export function RetirementCard(): React.JSX.Element {
   const { 
     retirementTimeFormatted, 
     retirementProgress, 

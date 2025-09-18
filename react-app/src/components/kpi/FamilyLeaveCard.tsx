@@ -8,7 +8,7 @@ import { APP_CONFIG } from '../../config/app-config';
  * Family Leave Card Component
  * Displays family leave progress and time remaining
  */
-export function FamilyLeaveCard(): JSX.Element {
+export function FamilyLeaveCard(): React.JSX.Element {
   const { 
     familyLeaveTimeFormatted, 
     familyLeaveProgress, 

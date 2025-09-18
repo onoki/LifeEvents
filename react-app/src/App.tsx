@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react'
 import { APP_CONFIG } from './config/app-config'
 import './styles/accessibility.css'
 
-function App(): JSX.Element {
+function App(): React.JSX.Element {
   const [sheetsUrl, setSheetsUrl] = useState<string>('')
   const { 
     data, 

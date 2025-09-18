@@ -8,7 +8,7 @@ import { APP_CONFIG } from '../../config/app-config';
  * Work Progress Card Component
  * Displays current work day progress with time remaining
  */
-export function WorkProgressCard(): JSX.Element {
+export function WorkProgressCard(): React.JSX.Element {
   const { workTimeFormatted, workProgress } = useKPICalculations();
 
   return (

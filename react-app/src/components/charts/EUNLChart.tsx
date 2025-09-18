@@ -1,5 +1,5 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 import type { EUNLChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
@@ -16,11 +16,11 @@ export function EUNLChart({
   showOnlyDataWithStocks, 
   stocksData, 
   viewMode 
-}: EUNLChartProps): JSX.Element {
+}: EUNLChartProps): React.JSX.Element {
   // Show empty state if no EUNL data
   if (!data || data.length === 0) {
     return (
-      <div className="bg-card border border-gray-600 rounded-lg p-6" style={{ paddingRight: '0px' }}>
+      <div className="bg-card border border-gray-600 rounded-lg p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">{title}</h3>
@@ -75,16 +75,16 @@ export function EUNLChart({
           return itemDate >= minMonth && itemDate <= maxMonth;
         });
       }
-    } else if (data[0].stocks_in_eur !== undefined) {
+    } else if ('stocks_in_eur' in data[0] && data[0].stocks_in_eur !== undefined) {
       // This is stocks data - filter normally
-      filteredData = data.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
+      filteredData = data.filter(item => 'stocks_in_eur' in item && item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
     }
   }
 
   const chartData = filteredData;
 
   return (
-    <div className="bg-card border border-gray-600 rounded-lg p-6" style={{ paddingRight: '0px' }}>
+    <div className="bg-card border border-gray-600 rounded-lg p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">{title}</h3>

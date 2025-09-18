@@ -10,7 +10,7 @@ interface ViewModeToggleProps {
  * View Mode Toggle Component
  * Allows users to switch between different data view modes
  */
-export function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeToggleProps): JSX.Element {
+export function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeToggleProps): React.JSX.Element {
   const modes: Array<{ key: ViewMode; label: string }> = [
     { key: 'recorded', label: 'Show only recorded range' },
     { key: 'next2years', label: 'Show next 2 years' },

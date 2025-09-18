@@ -1,5 +1,5 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 import type { StockChartProps, MilestoneMarker } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
@@ -8,11 +8,11 @@ import { APP_CONFIG } from '../../config/app-config';
  * Stock Chart Component
  * Displays stock value progression with target lines and milestone markers
  */
-export function StockChart({ title, data, dataKey, config, conditions }: StockChartProps): JSX.Element {
+export function StockChart({ title, data, dataKey, config, conditions }: StockChartProps): React.JSX.Element {
   // Calculate milestone markers for conditions
   const milestoneMarkers: MilestoneMarker[] = [];
   if (conditions && conditions.length > 0) {
-    conditions.forEach((condition, index) => {
+    conditions.forEach((condition) => {
       const conditionValue = parseFloat(condition.condition || '0');
       if (!isNaN(conditionValue)) {
         // Find the first data point where targetWithMinimumContribution exceeds the condition
@@ -21,7 +21,7 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
           item.targetWithMinimumContribution >= conditionValue
         );
         
-        if (milestonePoint) {
+        if (milestonePoint && milestonePoint.targetWithMinimumContribution) {
           milestoneMarkers.push({
             x: milestonePoint.dateFormatted,
             y: milestonePoint.targetWithMinimumContribution,
@@ -34,7 +34,7 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
   }
   
   return (
-    <div className="bg-card border border-gray-600 rounded-lg p-6" style={{ paddingRight: '0px' }}>
+    <div className="bg-card border border-gray-600 rounded-lg p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
@@ -116,7 +116,7 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
                   </g>
                 );
               }
-              return null;
+              return <circle cx={cx} cy={cy} r={0} fill="transparent" />;
             }}
             activeDot={{ r: 3, fill: '#10b981' }}
           />

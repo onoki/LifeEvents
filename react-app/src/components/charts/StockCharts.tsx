@@ -18,7 +18,7 @@ export function StockCharts({
   eunlData, 
   onFetchEUNL, 
   loading 
-}: StockChartsProps): JSX.Element {
+}: StockChartsProps): React.JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('next2years');
 
   if (!data || data.length === 0) {

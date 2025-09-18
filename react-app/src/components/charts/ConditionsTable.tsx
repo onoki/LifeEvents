@@ -9,7 +9,7 @@ interface ConditionsTableProps {
  * Conditions Table Component
  * Displays reward conditions in a table format
  */
-export function ConditionsTable({ conditions }: ConditionsTableProps): JSX.Element {
+export function ConditionsTable({ conditions }: ConditionsTableProps): React.JSX.Element {
   if (!conditions || conditions.length === 0) {
     return null;
   }
