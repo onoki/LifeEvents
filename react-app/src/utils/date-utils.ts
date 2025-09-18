@@ -29,7 +29,6 @@ export function countWorkdaysWithVacation(startDate: Date, endDate: Date): numbe
   while (current < endDate) {
     const dayOfWeek = current.getDay();
     const month = current.getMonth();
-    const year = current.getFullYear();
     
     // Check if it's a workday (Monday-Friday)
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {

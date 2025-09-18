@@ -16,7 +16,7 @@ export function ConditionsTable({ conditions }: ConditionsTableProps): React.JSX
 
   return (
     <div className="mt-6">
-      <div className="bg-card border border-gray-600 rounded-lg p-6">
+      <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
         <h3 className="text-lg font-semibold mb-4">Reward Conditions</h3>
         <div className="overflow-x-auto">
           <table className="w-full">

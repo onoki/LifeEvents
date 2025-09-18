@@ -17,7 +17,7 @@ export function RetirementCard(): React.JSX.Element {
 
   return (
     <Card className="border-gray-600">
-      <CardContent className="pt-6 pb-6 flex flex-col h-full">
+      <CardContent className="pt-6 pb-6 px-2 sm:px-6 flex flex-col h-full">
         <div className="flex justify-between items-center flex-grow">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 text-gray-600 flex items-center justify-center">

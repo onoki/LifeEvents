@@ -23,7 +23,7 @@ export function StockCharts({
 
   if (!data || data.length === 0) {
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-6 mb-8">
         <div className="text-center py-8 text-muted-foreground">
           No stock data available
         </div>
@@ -57,7 +57,7 @@ export function StockCharts({
         <ConditionsTable conditions={conditions} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-6 mb-8">
         {/* Minimum Required Contributions Chart */}
         <MinRequiredContributionsChart 
           title="Minimum required monthly contributions to reach the goal" 

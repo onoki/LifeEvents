@@ -34,7 +34,7 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
   }
   
   return (
-    <div className="bg-card border border-gray-600 rounded-lg p-6">
+    <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>

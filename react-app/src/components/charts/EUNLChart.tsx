@@ -20,7 +20,7 @@ export function EUNLChart({
   // Show empty state if no EUNL data
   if (!data || data.length === 0) {
     return (
-      <div className="bg-card border border-gray-600 rounded-lg p-6">
+      <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">{title}</h3>

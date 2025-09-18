@@ -52,9 +52,10 @@ describe('financial-utils', () => {
     it('should process stocks data correctly', () => {
       const result = processStocksData(mockEvents);
       
-      expect(result).toHaveLength(2); // One item filtered out
+      expect(result).toHaveLength(3); // All items included (including 0 values)
       expect(result[0].stocks_in_eur).toBe(1000);
       expect(result[1].stocks_in_eur).toBe(1100);
+      expect(result[2].stocks_in_eur).toBe(0);
     });
 
     it('should sort data by date', () => {

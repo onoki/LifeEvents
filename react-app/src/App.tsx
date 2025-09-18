@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/UI/card"
+import { Card, CardContent } from "@/components/UI/card"
 import { Button } from "@/components/UI/button"
-import { Input } from "@/components/UI/input"
-import { Label } from "@/components/UI/label"
 import { KPICards } from './components/KPI/KPICards'
 import { StockCharts } from './components/Charts/StockCharts'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useAppStore } from './store/use-app-store'
-import { Loader2 } from 'lucide-react'
 import { APP_CONFIG } from './config/app-config'
 import './styles/accessibility.css'
 
@@ -20,7 +17,6 @@ function App(): React.JSX.Element {
     loading, 
     error, 
     loadData, 
-    status, 
     eunlData, 
     fetchEUNLData 
   } = useAppStore()
@@ -45,11 +41,6 @@ function App(): React.JSX.Element {
     await loadData(sheetsUrl)
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
-      handleLoadData()
-    }
-  }
 
   const handleFetchEUNL = async (): Promise<void> => {
     await fetchEUNLData()
@@ -58,12 +49,12 @@ function App(): React.JSX.Element {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background text-foreground">
-        <div className="container mx-auto px-4 py-6 max-w-6xl">
+        <div className="container mx-auto px-2 sm:px-4 py-6 max-w-6xl">
 
         {/* Error State */}
         {error && (
           <Card className="mb-6 border-destructive">
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 px-2 sm:px-6">
               <div className="text-center">
                 <div className="text-destructive text-6xl mb-4">⚠️</div>
                 <h3 className="text-xl font-semibold mb-2">Failed to Load Data</h3>
@@ -102,7 +93,7 @@ function App(): React.JSX.Element {
         {/* Empty State */}
         {!loading && !error && (!data || data.length === 0) && (
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 px-2 sm:px-6">
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📊</div>
                 <h3 className="text-xl font-semibold mb-2">No Data Loaded</h3>
