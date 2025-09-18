@@ -18,7 +18,7 @@ export interface Condition {
 }
 
 export interface Config {
-  [key: string]: string;
+  [key: string]: string | undefined;
   investment_goal?: string;
   annual_growth_rate?: string;
 }

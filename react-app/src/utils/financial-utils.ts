@@ -23,7 +23,7 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
   const firstStocksData = sortedData.find(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
   if (!firstStocksData) return [];
   
-  const firstValue = parseFloat(firstStocksData.stocks_in_eur.toString());
+  const firstValue = parseFloat(firstStocksData.stocks_in_eur!.toString());
   
   // Calculate total number of months from first to last date
   const totalMonths = (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + 
@@ -58,7 +58,7 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
     const latestMonthsFromStart = (latestDataPoint.date.getFullYear() - firstDate.getFullYear()) * 12 + 
                                  (latestDataPoint.date.getMonth() - firstDate.getMonth());
     const monthsRemaining = totalMonths - latestMonthsFromStart;
-    const currentValue = parseFloat(latestDataPoint.stocks_in_eur.toString());
+    const currentValue = parseFloat(latestDataPoint.stocks_in_eur!.toString());
     const futureValueOfCurrent = currentValue * Math.pow(1 + monthlyGrowthRate, monthsRemaining);
     const remainingToAchieve = investmentGoal - futureValueOfCurrent;
     
@@ -196,7 +196,7 @@ export function calculateExponentialTrend(data: any[]): any[] {
 
   // Convert dates to numeric values (days since first date)
   const firstDate = data[0].date;
-  const numericData = data.map((item, index) => ({
+  const numericData = data.map((item) => ({
     ...item,
     x: (item.date.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24), // days since first date
     y: item.price

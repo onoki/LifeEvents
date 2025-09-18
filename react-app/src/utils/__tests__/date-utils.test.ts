@@ -1,14 +1,10 @@
 import {
   countWorkdays,
-  countWorkdaysWithVacation,
   getWorkProgress,
   getWorkTimeFormatted,
   getFamilyLeaveTimeFormatted,
   getFamilyLeaveProgress,
-  getFamilyLeaveWorkdays,
-  getRetirementTimeFormatted,
   getRetirementProgress,
-  getRetirementWorkdays,
   getDaysToDate,
 } from '../date-utils';
 

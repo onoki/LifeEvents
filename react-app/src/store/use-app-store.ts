@@ -44,7 +44,7 @@ const initialState = {
 
 export const useAppStore = create<AppState>()(
   devtools(
-    (set, get) => ({
+    (set) => ({
       ...initialState,
 
       // Simple setters

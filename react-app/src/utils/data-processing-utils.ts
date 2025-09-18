@@ -107,7 +107,7 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
   
   const headers = dataLines[0].split('\t').map(h => h.trim());
   
-  const parsedData = dataLines.slice(1).map((line, index) => {
+  const parsedData = dataLines.slice(1).map((line) => {
     const values = line.split('\t').map(v => v.trim());
     const event: any = {};
     
@@ -212,7 +212,7 @@ export function calculateMilestoneMarkers(
   const milestoneMarkers: Array<{ x: string; y: number; label: string; condition: number }> = [];
   
   if (conditions && conditions.length > 0) {
-    conditions.forEach((condition, index) => {
+    conditions.forEach((condition) => {
       const conditionValue = parseFloat(condition.condition || '0');
       if (!isNaN(conditionValue)) {
         // Find the first data point where targetWithMinimumContribution exceeds the condition
