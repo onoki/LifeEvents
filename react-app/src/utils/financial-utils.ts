@@ -189,7 +189,7 @@ export function processStocksData(data: Event[]): ChartDataPoint[] {
 }
 
 /**
- * Calculate exponential trend line for EUNL data
+ * Calculate exponential trend line for EUNL data with confidence intervals
  */
 export function calculateExponentialTrend(data: any[]): any[] {
   if (!data || data.length < 2) return data;
@@ -216,11 +216,37 @@ export function calculateExponentialTrend(data: any[]): any[] {
   const lnA = (sumY - b * sumX) / n;
   const a = Math.exp(lnA);
 
-  // Generate trend line data
-  return data.map(item => ({
-    ...item,
-    trend: a * Math.exp(b * ((item.date.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)))
-  }));
+  // Calculate residuals for standard deviation
+  const residuals = numericData.map(item => {
+    const predicted = Math.log(a * Math.exp(b * item.x));
+    const actual = Math.log(item.y);
+    return Math.pow(actual - predicted, 2);
+  });
+
+  // Calculate standard deviation of residuals
+  const sumSquaredResiduals = residuals.reduce((sum, residual) => sum + residual, 0);
+  const standardDeviation = Math.sqrt(sumSquaredResiduals / (n - 2)); // n-2 for degrees of freedom
+
+  // Generate trend line data with confidence intervals
+  return data.map(item => {
+    const x = (item.date.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
+    const trend = a * Math.exp(b * x);
+    
+    // Calculate confidence intervals (±1 standard deviation)
+    const confidenceInterval = standardDeviation * trend;
+    const upperBound = trend + confidenceInterval;
+    const lowerBound = Math.max(0, trend - confidenceInterval); // Don't go below 0 for prices
+    
+    return {
+      ...item,
+      trend,
+      trendUpperBound: upperBound,
+      trendLowerBound: lowerBound,
+      // Add indicators for when price is outside confidence interval
+      isAboveUpperBound: item.price !== null && item.price > upperBound,
+      isBelowLowerBound: item.price !== null && item.price < lowerBound
+    };
+  });
 }
 
 /**

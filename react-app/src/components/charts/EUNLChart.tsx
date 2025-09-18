@@ -1,5 +1,5 @@
 import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, Legend } from 'recharts';
 import type { EUNLChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
@@ -123,25 +123,62 @@ export function EUNLChart({
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value, name) => [formatCurrency(value as number), name === 'price' ? 'EUNL price' : 'Trend']}
+            formatter={(value, name) => {
+              const formattedValue = formatCurrency(value as number);
+              const nameMap: { [key: string]: string } = {
+                'price': 'EUNL Price',
+                'trend': 'Trend',
+                'trendUpperBound': 'Standard deviation (+1σ)',
+                'trendLowerBound': 'Standard deviation (-1σ)'
+              };
+              return [formattedValue, nameMap[name as string] || name];
+            }}
+            labelFormatter={(label) => `Date: ${label}`}
           />
+          
+          
+          {/* Main price area */}
           <Area 
             type="monotone" 
             dataKey={data.length > 0 && data[0].price !== undefined ? "price" : "stocks_in_eur"}
             stroke="#06b6d4" 
             fill="#06b6d4"
             fillOpacity={0.3}
-            strokeWidth={1}
+            strokeWidth={2}
             dot={false}
             activeDot={{ r: 4, fill: '#06b6d4' }}
           />
+          
+          {/* Trend line */}
           <Line 
             type="monotone" 
             dataKey="trend"
             stroke="#ef4444" 
-            strokeWidth={1}
+            strokeWidth={2}
             dot={false}
             activeDot={{ r: 4, fill: '#ef4444' }}
+          />
+          
+          {/* Confidence interval bounds - subtle dashed lines */}
+          <Line 
+            type="monotone" 
+            dataKey="trendUpperBound"
+            stroke="#ef4444" 
+            strokeWidth={1}
+            strokeDasharray="5 5"
+            strokeOpacity={0.6}
+            dot={false}
+            activeDot={false}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="trendLowerBound"
+            stroke="#ef4444" 
+            strokeWidth={1}
+            strokeDasharray="5 5"
+            strokeOpacity={0.6}
+            dot={false}
+            activeDot={false}
           />
         </ComposedChart>
       </ResponsiveContainer>
