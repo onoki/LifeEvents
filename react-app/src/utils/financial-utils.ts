@@ -262,3 +262,74 @@ export function formatCurrency(value: number): string {
 export function formatPercentage(value: number, decimals: number = 3): string {
   return `${value.toFixed(decimals)} %`;
 }
+
+/**
+ * Calculate current stock value estimate based on last recorded value and growth
+ */
+export function calculateCurrentStockEstimate(
+  data: Event[], 
+  config: Config, 
+  currentTime: Date = new Date(),
+  chartData?: any[] // Optional chart data with pre-calculated minRequiredContribution
+): { currentEstimate: number; changePerDay: number; changePerHour: number } {
+  if (!data || data.length === 0) {
+    return { currentEstimate: 0, changePerDay: 0, changePerHour: 0 };
+  }
+
+  // Get the last recorded stock value
+  const sortedData = [...data]
+    .filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0)
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  if (sortedData.length === 0) {
+    return { currentEstimate: 0, changePerDay: 0, changePerHour: 0 };
+  }
+
+  const lastRecord = sortedData[0];
+  const lastValue = parseFloat(lastRecord.stocks_in_eur!.toString());
+  const lastDate = lastRecord.date;
+
+  // Get configuration values
+  const annualGrowthRate = parseFloat(config.annual_growth_rate || '0.07');
+  const dailyGrowthRate = annualGrowthRate / 365;
+
+  // Calculate time difference
+  const timeDiffMs = currentTime.getTime() - lastDate.getTime();
+  const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
+
+  // Calculate growth from last recorded value
+  const growthFactor = Math.pow(1 + dailyGrowthRate, timeDiffDays);
+  const valueFromGrowth = lastValue * growthFactor;
+
+  // Calculate minimum contribution effect
+  // Scale from 0% to 100% over 1 month (30 days)
+  const contributionScale = Math.min(timeDiffDays / 30, 1);
+  
+  // Get minimum contribution from the pre-calculated chart data
+  let minimumContribution = 0;
+  if (chartData && chartData.length > 0) {
+    // Find the latest data point with minimum contribution
+    const latestChartData = chartData
+      .filter(item => item.minRequiredContribution !== undefined && item.minRequiredContribution !== null)
+      .sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+    
+    if (latestChartData) {
+      minimumContribution = latestChartData.minRequiredContribution;
+    }
+  }
+  
+  const contributionEffect = minimumContribution * contributionScale;
+
+  // Final estimate
+  const currentEstimate = valueFromGrowth + contributionEffect;
+
+  // Calculate changes
+  const changePerDay = currentEstimate * dailyGrowthRate;
+  const changePerHour = changePerDay / 24;
+
+  return {
+    currentEstimate,
+    changePerDay,
+    changePerHour
+  };
+}

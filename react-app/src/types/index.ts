@@ -70,6 +70,7 @@ export interface StockChartProps {
   dataKey: string;
   config: Config;
   conditions: Condition[];
+  rawData?: Event[];
 }
 
 export interface EUNLChartProps {

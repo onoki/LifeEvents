@@ -51,6 +51,7 @@ export function StockCharts({
           dataKey="stocks_in_eur"
           config={config}
           conditions={conditions}
+          rawData={data}
         />
         
         {/* Conditions table below the chart */}

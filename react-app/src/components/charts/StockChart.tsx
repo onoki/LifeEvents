@@ -3,12 +3,13 @@ import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Compos
 import type { StockChartProps, MilestoneMarker } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
+import { StockValueIndicator } from './StockValueIndicator';
 
 /**
  * Stock Chart Component
  * Displays stock value progression with target lines and milestone markers
  */
-export function StockChart({ title, data, dataKey, config, conditions }: StockChartProps): React.JSX.Element {
+export function StockChart({ title, data, dataKey, config, conditions, rawData }: StockChartProps): React.JSX.Element {
   // Calculate milestone markers for conditions
   const milestoneMarkers: MilestoneMarker[] = [];
   if (conditions && conditions.length > 0) {
@@ -116,7 +117,7 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
                   </g>
                 );
               }
-              return <circle cx={cx} cy={cy} r={0} fill="transparent" />;
+              return <circle key={`empty-${cx}-${cy}`} cx={cx} cy={cy} r={0} fill="transparent" />;
             }}
             activeDot={{ r: 3, fill: '#10b981' }}
           />
@@ -151,6 +152,11 @@ export function StockChart({ title, data, dataKey, config, conditions }: StockCh
           />
         </ComposedChart>
       </ResponsiveContainer>
+      
+      {/* Stock Value Indicator */}
+      {rawData && (
+        <StockValueIndicator data={rawData} config={config} chartData={data} />
+      )}
     </div>
   );
 }
