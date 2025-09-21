@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/UI/card';
 import { useKPICalculations } from '../../hooks/use-kpi-calculations';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { formatPercentage } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
 
@@ -14,6 +15,7 @@ export function RetirementCard(): React.JSX.Element {
     retirementProgress, 
     retirementWorkdays 
   } = useKPICalculations();
+  const { isPrivacyMode } = usePrivacyMode();
 
   return (
     <Card className="border-gray-600">
@@ -34,9 +36,11 @@ export function RetirementCard(): React.JSX.Element {
               </svg>
             </div>
             <div>
-              <div className="text-3xl font-bold">{retirementTimeFormatted}</div>
+              <div className="text-3xl font-bold">
+                {isPrivacyMode ? '••••' : retirementTimeFormatted}
+              </div>
               <div className="text-lg font-medium text-gray-500">
-                {retirementWorkdays.toLocaleString('en-US').replace(/,/g, ' ')} workdays
+                {isPrivacyMode ? '•••• workdays' : `${retirementWorkdays.toLocaleString('en-US').replace(/,/g, ' ')} workdays`}
               </div>
             </div>
           </div>
@@ -52,8 +56,8 @@ export function RetirementCard(): React.JSX.Element {
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2 mb-1">
-            <span>{APP_CONFIG.DATES.RETIREMENT_START.split('T')[0]}</span>
-            <span>{APP_CONFIG.DATES.RETIREMENT_END.split('T')[0]}</span>
+            <span>{isPrivacyMode ? '••••-••-••' : APP_CONFIG.DATES.RETIREMENT_START.split('T')[0]}</span>
+            <span>{isPrivacyMode ? '••••-••-••' : APP_CONFIG.DATES.RETIREMENT_END.split('T')[0]}</span>
           </div>
         </div>
       </CardContent>

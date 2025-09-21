@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CountUp } from '../UI/countup';
 import { calculateCurrentStockEstimate } from '../../utils/financial-utils';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import type { Event, Config } from '../../types';
 
 interface StockValueIndicatorProps {
@@ -15,6 +16,7 @@ interface StockValueIndicatorProps {
  */
 export function StockValueIndicator({ data, config, chartData }: StockValueIndicatorProps): React.JSX.Element {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { isPrivacyMode } = usePrivacyMode();
 
   // Update time every minute
   useEffect(() => {
@@ -28,6 +30,14 @@ export function StockValueIndicator({ data, config, chartData }: StockValueIndic
   const stockValueEstimate = useMemo(() => {
     return calculateCurrentStockEstimate(data, config, currentTime, chartData);
   }, [data, config, currentTime, chartData]);
+
+  if (isPrivacyMode) {
+    return (
+      <div className="mt-4 text-sm text-muted-foreground">
+        Today's estimate: ••••
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 text-sm text-muted-foreground">

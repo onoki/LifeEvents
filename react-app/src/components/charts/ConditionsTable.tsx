@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Condition } from '../../types';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 
 interface ConditionsTableProps {
   conditions: Condition[];
@@ -10,6 +11,8 @@ interface ConditionsTableProps {
  * Displays reward conditions in a table format
  */
 export function ConditionsTable({ conditions }: ConditionsTableProps): React.JSX.Element {
+  const { isPrivacyMode } = usePrivacyMode();
+  
   if (!conditions || conditions.length === 0) {
     return null;
   }
@@ -38,17 +41,18 @@ export function ConditionsTable({ conditions }: ConditionsTableProps): React.JSX
                 <tr key={index} className="border-b border-gray-600 last:border-b-0">
                   <td className="py-3 px-4 text-sm">
                     <span className="font-mono bg-gray-800 px-2 py-1 rounded text-xs whitespace-nowrap">
-                      {condition.condition ? 
-                        `${Math.round(parseFloat(condition.condition) / 1000)}k€` : 
-                        'N/A'
+                      {isPrivacyMode ? '••••' : 
+                        condition.condition ? 
+                          `${Math.round(parseFloat(condition.condition) / 1000)}k€` : 
+                          'N/A'
                       }
                     </span>
                   </td>
                   <td className="py-3 px-4 text-sm font-medium">
-                    {condition.explanation_short || 'N/A'}
+                    {isPrivacyMode ? '••••' : (condition.explanation_short || 'N/A')}
                   </td>
                   <td className="py-3 px-4 text-sm text-muted-foreground">
-                    {condition.explanation_long || 'N/A'}
+                    {isPrivacyMode ? '••••' : (condition.explanation_long || 'N/A')}
                   </td>
                 </tr>
               ))}

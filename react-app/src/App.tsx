@@ -5,6 +5,7 @@ import { KPICards } from './components/KPI/KPICards'
 import { StockCharts } from './components/Charts/StockCharts'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useAppStore } from './store/use-app-store'
+import { usePrivacyMode } from './hooks/use-privacy-mode'
 import { APP_CONFIG } from './config/app-config'
 import './styles/accessibility.css'
 
@@ -20,6 +21,7 @@ function App(): React.JSX.Element {
     eunlData, 
     fetchEUNLData 
   } = useAppStore()
+  const { isPrivacyMode, getPrivacyUrl, getPublicUrl } = usePrivacyMode()
 
   // Load URL from GET parameter on component mount
   useEffect(() => {
@@ -130,6 +132,20 @@ function App(): React.JSX.Element {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Privacy Toggle Link - Only show "Hide exact values" when not in privacy mode */}
+        {data && data.length > 0 && !isPrivacyMode && (
+          <div className="mt-8 text-center">
+            <div className="text-sm text-muted-foreground">
+              <a 
+                href={getPrivacyUrl()} 
+                className="text-blue-500 hover:text-blue-400 underline"
+              >
+                Hide exact values
+              </a>
+            </div>
+          </div>
         )}
         </div>
       </div>

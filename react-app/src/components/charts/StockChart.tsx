@@ -2,6 +2,7 @@ import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 import type { StockChartProps, MilestoneMarker } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 import { StockValueIndicator } from './StockValueIndicator';
 
@@ -10,6 +11,8 @@ import { StockValueIndicator } from './StockValueIndicator';
  * Displays stock value progression with target lines and milestone markers
  */
 export function StockChart({ title, data, dataKey, config, conditions, rawData }: StockChartProps): React.JSX.Element {
+  const { isPrivacyMode } = usePrivacyMode();
+  
   // Calculate milestone markers for conditions
   const milestoneMarkers: MilestoneMarker[] = [];
   if (conditions && conditions.length > 0) {
@@ -50,30 +53,32 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
           <YAxis 
             tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => `${Math.round(value / 1000)}k€`}
+            tickFormatter={(value) => isPrivacyMode ? '•••' : `${Math.round(value / 1000)}k€`}
             domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
             width={40}
             orientation="right"
           />
-          <Tooltip 
-            contentStyle={{
-              backgroundColor: 'hsl(var(--popover))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
-              color: 'hsl(var(--popover-foreground))'
-            }}
-            formatter={(value, name) => {
-              const annualGrowthRate = parseFloat(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
-              const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
-                           name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
-                           name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
-                           name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
-                           name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
-                           'Unknown';
-              return [formatCurrency(value as number), label];
-            }}
-          />
+          {!isPrivacyMode && (
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: 'hsl(var(--popover))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
+                color: 'hsl(var(--popover-foreground))'
+              }}
+              formatter={(value, name) => {
+                const annualGrowthRate = parseFloat(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
+                const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
+                             name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
+                             name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
+                             name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
+                             name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
+                             'Unknown';
+                return [formatCurrency(value as number), label];
+              }}
+            />
+          )}
           {/* 1. 8% growth scenario (background) */}
           <Line 
             type="monotone" 
@@ -112,7 +117,7 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
                       fontSize="10" 
                       fontWeight="bold"
                     >
-                      {milestone.label}
+                      {isPrivacyMode ? 'Reward' : milestone.label}
                     </text>
                   </g>
                 );

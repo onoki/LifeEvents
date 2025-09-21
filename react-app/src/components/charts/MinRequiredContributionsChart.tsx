@@ -2,6 +2,7 @@ import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import type { MinRequiredContributionsChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 
 /**
@@ -9,6 +10,7 @@ import { APP_CONFIG } from '../../config/app-config';
  * Displays the minimum required monthly contributions to reach investment goals
  */
 export function MinRequiredContributionsChart({ title, data }: MinRequiredContributionsChartProps): React.JSX.Element {
+  const { isPrivacyMode } = usePrivacyMode();
   // Add target line data to the main dataset
   const chartData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -85,25 +87,27 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
           <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => formatCurrency(value)}
+            tickFormatter={(value) => isPrivacyMode ? '•••' : formatCurrency(value)}
             domain={[(dataMin) => Math.min(dataMin, 0), 'dataMax']}
             orientation="right"
           />
-          <Tooltip 
-            contentStyle={{
-              backgroundColor: 'hsl(var(--popover))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
-              color: 'hsl(var(--popover-foreground))'
-            }}
-            formatter={(value, name) => {
-              const label = name === 'minRequiredContributionArea' ? 'Minimum required monthly contribution' : 
-                           name === 'minRequiredContributionLine' ? 'Minimum required monthly contribution' :
-                           name === 'targetLine' ? 'Target' : 'Unknown';
-              return [formatCurrency(value as number), label];
-            }}
-          />
+          {!isPrivacyMode && (
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: 'hsl(var(--popover))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
+                color: 'hsl(var(--popover-foreground))'
+              }}
+              formatter={(value, name) => {
+                const label = name === 'minRequiredContributionArea' ? 'Minimum required monthly contribution' : 
+                             name === 'minRequiredContributionLine' ? 'Minimum required monthly contribution' :
+                             name === 'targetLine' ? 'Target' : 'Unknown';
+                return [formatCurrency(value as number), label];
+              }}
+            />
+          )}
           <Area 
             type="monotone" 
             dataKey="minRequiredContributionArea"
