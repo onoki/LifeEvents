@@ -271,9 +271,9 @@ export function calculateCurrentStockEstimate(
   config: Config, 
   currentTime: Date = new Date(),
   chartData?: any[] // Optional chart data with pre-calculated minRequiredContribution
-): { currentEstimate: number; changePerDay: number; changePerHour: number } {
+): { currentEstimate: number; changePerDay: number } {
   if (!data || data.length === 0) {
-    return { currentEstimate: 0, changePerDay: 0, changePerHour: 0 };
+    return { currentEstimate: 0, changePerDay: 0 };
   }
 
   // Get the last recorded stock value
@@ -282,7 +282,7 @@ export function calculateCurrentStockEstimate(
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   if (sortedData.length === 0) {
-    return { currentEstimate: 0, changePerDay: 0, changePerHour: 0 };
+    return { currentEstimate: 0, changePerDay: 0 };
   }
 
   const lastRecord = sortedData[0];
@@ -324,12 +324,10 @@ export function calculateCurrentStockEstimate(
   const currentEstimate = valueFromGrowth + contributionEffect;
 
   // Calculate changes
-  const changePerDay = currentEstimate * dailyGrowthRate;
-  const changePerHour = changePerDay / 24;
+  const changePerDay = valueFromGrowth * dailyGrowthRate + minimumContribution / 30;
 
   return {
     currentEstimate,
-    changePerDay,
-    changePerHour
+    changePerDay
   };
 }
