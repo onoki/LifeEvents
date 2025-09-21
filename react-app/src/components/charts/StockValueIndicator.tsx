@@ -52,7 +52,8 @@ export function StockValueIndicator({ data, config, chartData }: StockValueIndic
         value={stockValueEstimate.changePerDay} 
         decimals={2}
         className="font-semibold text-green-600"
-      /> &nbsp;€/d
+        suffix=" €/d"
+      />
     </div>
   );
 }
