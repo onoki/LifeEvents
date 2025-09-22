@@ -2,10 +2,16 @@ import { APP_CONFIG } from '../config/app-config';
 
 /**
  * Calculate the number of workdays between two dates
+ * Uses 16:00 as the day transition time (workdays decrease at 16:00)
  */
 export function countWorkdays(startDate: Date, endDate: Date): number {
   let count = 0;
   const current = new Date(startDate);
+  
+  // If start time is 16:00 or later, move to next day
+  if (current.getHours() >= 16) {
+    current.setDate(current.getDate() + 1);
+  }
   
   while (current < endDate) {
     const dayOfWeek = current.getDay();
@@ -21,10 +27,16 @@ export function countWorkdays(startDate: Date, endDate: Date): number {
 
 /**
  * Calculate workdays with vacation time excluded
+ * Uses 16:00 as the day transition time (workdays decrease at 16:00)
  */
 export function countWorkdaysWithVacation(startDate: Date, endDate: Date): number {
   let count = 0;
   const current = new Date(startDate);
+  
+  // If start time is 16:00 or later, move to next day
+  if (current.getHours() >= 16) {
+    current.setDate(current.getDate() + 1);
+  }
   
   while (current < endDate) {
     const dayOfWeek = current.getDay();

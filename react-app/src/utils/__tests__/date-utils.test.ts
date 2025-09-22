@@ -23,13 +23,39 @@ describe('dateUtils', () => {
       const workdays = countWorkdays(date, date);
       expect(workdays).toBe(0);
     });
+
+    it('should decrease workdays at 16:00 (4 PM)', () => {
+      // Test that workdays decrease at 16:00, not at midnight
+      const mondayBefore4PM = new Date('2024-01-01T15:59:00'); // Monday 3:59 PM
+      const mondayAfter4PM = new Date('2024-01-01T16:01:00');   // Monday 4:01 PM
+      const wednesday = new Date('2024-01-03T10:00:00');        // Wednesday 10:00 AM
+      
+      const workdaysBefore4PM = countWorkdays(mondayBefore4PM, wednesday);
+      const workdaysAfter4PM = countWorkdays(mondayAfter4PM, wednesday);
+      
+      // Before 4 PM: Monday, Tuesday count (2 workdays)
+      // After 4 PM: Only Tuesday counts (1 workday)
+      expect(workdaysBefore4PM).toBe(2);
+      expect(workdaysAfter4PM).toBe(1);
+    });
+
+    it('should count current day as workday before 16:00', () => {
+      // Test that current day counts if it's before 16:00
+      const monday6AM = new Date('2024-01-01T06:00:00'); // Monday 6:00 AM
+      const tuesday = new Date('2024-01-02T10:00:00');    // Tuesday 10:00 AM
+      
+      const workdays = countWorkdays(monday6AM, tuesday);
+      
+      // Monday (6 AM) and Tuesday should both count = 2 workdays
+      expect(workdays).toBe(2);
+    });
   });
 
   describe('getWorkProgress', () => {
-    it('should return 0% for weekends', () => {
+    it('should return 100% for weekends', () => {
       const saturday = new Date('2024-01-06T10:00:00'); // Saturday
       const progress = getWorkProgress(saturday);
-      expect(progress).toBe(0); // Function returns 0 for weekends/before work
+      expect(progress).toBe(100); // Function returns 100% for weekends (work day complete)
     });
 
     it('should return 0% before work start time', () => {
@@ -59,10 +85,10 @@ describe('dateUtils', () => {
       expect(time).toBe('0 min');
     });
 
-    it('should return "0 h 0 min" after work hours', () => {
+    it('should return full work day duration after work hours', () => {
       const afterWork = new Date('2024-01-01T18:00:00'); // Monday 6 PM
       const time = getWorkTimeFormatted(afterWork);
-      expect(time).toBe('0 min');
+      expect(time).toBe('8 h 0 min'); // Full work day duration (8:30 AM to 4:30 PM = 8 hours)
     });
 
     it('should return formatted time during work hours', () => {
