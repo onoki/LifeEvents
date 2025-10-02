@@ -137,23 +137,10 @@ export function getWorkTimeFormatted(currentTime: Date): string {
   const workEnd = new Date(now);
   workEnd.setHours(APP_CONFIG.WORK_SCHEDULE.END_HOUR, APP_CONFIG.WORK_SCHEDULE.END_MINUTE, 0, 0);
   
-  // If it's already past work end, show the full work day duration
+  // If it's already past work end, show 0 min (no work remaining)
   if (now.getHours() > APP_CONFIG.WORK_SCHEDULE.END_HOUR || 
       (now.getHours() === APP_CONFIG.WORK_SCHEDULE.END_HOUR && now.getMinutes() >= APP_CONFIG.WORK_SCHEDULE.END_MINUTE)) {
-    const workStart = new Date(now);
-    workStart.setHours(APP_CONFIG.WORK_SCHEDULE.START_HOUR, APP_CONFIG.WORK_SCHEDULE.START_MINUTE, 0, 0);
-    const workEnd = new Date(now);
-    workEnd.setHours(APP_CONFIG.WORK_SCHEDULE.END_HOUR, APP_CONFIG.WORK_SCHEDULE.END_MINUTE, 0, 0);
-    
-    const totalWorkTime = workEnd.getTime() - workStart.getTime();
-    const totalHours = Math.floor(totalWorkTime / (1000 * 60 * 60));
-    const totalMinutes = Math.floor((totalWorkTime % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (totalHours > 0) {
-      return `${totalHours} h ${totalMinutes} min`;
-    } else {
-      return `${totalMinutes} min`;
-    }
+    return "0 min";
   }
   
   const diffMs = workEnd.getTime() - now.getTime();

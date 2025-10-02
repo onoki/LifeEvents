@@ -85,10 +85,16 @@ describe('dateUtils', () => {
       expect(time).toBe('0 min');
     });
 
-    it('should return full work day duration after work hours', () => {
+    it('should return "0 min" after work hours', () => {
       const afterWork = new Date('2024-01-01T18:00:00'); // Monday 6 PM
       const time = getWorkTimeFormatted(afterWork);
-      expect(time).toBe('8 h 0 min'); // Full work day duration (8:30 AM to 4:30 PM = 8 hours)
+      expect(time).toBe('0 min'); // No work remaining after work hours
+    });
+
+    it('should return "0 min" at work end time', () => {
+      const atWorkEnd = new Date('2024-01-01T16:30:00'); // Monday 4:30 PM (work end)
+      const time = getWorkTimeFormatted(atWorkEnd);
+      expect(time).toBe('0 min'); // No work remaining at work end time
     });
 
     it('should return formatted time during work hours', () => {

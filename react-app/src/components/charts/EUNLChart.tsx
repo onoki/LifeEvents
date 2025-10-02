@@ -64,9 +64,13 @@ export function EUNLChart({
         const minMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
         let maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0); // Last day of the month
         
+        // Always extend by one additional month to show current month data
+        // This helps when you're at the beginning of a month and haven't invested yet
+        maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0); // One month beyond the last recorded month
+        
         // If viewMode is 'next2years', extend the range by 2 years
         if (viewMode === 'next2years') {
-          maxMonth = new Date(maxDate.getFullYear() + 2, maxDate.getMonth() + 1, 0);
+          maxMonth = new Date(maxDate.getFullYear() + 2, maxDate.getMonth() + 2, 0);
         }
         
         // Filter EUNL data to the same month range
