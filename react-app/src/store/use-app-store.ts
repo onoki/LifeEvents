@@ -8,6 +8,7 @@ interface AppState {
   config: Config;
   conditions: Condition[];
   eunlData: EUNLDataPoint[];
+  eunlTrendStats: { annualGrowthRate: number, standardDeviation: number } | null;
   
   // UI state
   loading: boolean;
@@ -20,6 +21,7 @@ interface AppState {
   setConfig: (config: Config) => void;
   setConditions: (conditions: Condition[]) => void;
   setEunlData: (data: EUNLDataPoint[]) => void;
+  setEunlTrendStats: (stats: { annualGrowthRate: number, standardDeviation: number } | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setStatus: (status: string) => void;
@@ -36,6 +38,7 @@ const initialState = {
   config: {},
   conditions: [],
   eunlData: [],
+  eunlTrendStats: null,
   loading: false,
   error: null,
   status: '',
@@ -52,6 +55,7 @@ export const useAppStore = create<AppState>()(
       setConfig: (config) => set({ config }),
       setConditions: (conditions) => set({ conditions }),
       setEunlData: (eunlData) => set({ eunlData }),
+      setEunlTrendStats: (eunlTrendStats) => set({ eunlTrendStats }),
       setLoading: (loading) => set({ loading }),
       setError: (error) => set({ error }),
       setStatus: (status) => set({ status }),
@@ -129,9 +133,10 @@ export const useAppStore = create<AppState>()(
           })).filter((item: EUNLDataPoint) => item.price !== null);
 
           // Calculate trend and set data
-          const eunlDataWithTrend = calculateExponentialTrend(eunlData);
+          const { data: eunlDataWithTrend, trendStats } = calculateExponentialTrend(eunlData);
           set({ 
             eunlData: eunlDataWithTrend,
+            eunlTrendStats: trendStats,
             status: `Loaded ${eunlData.length} EUNL data points successfully`
           });
           

@@ -19,7 +19,8 @@ function App(): React.JSX.Element {
     error, 
     loadData, 
     eunlData, 
-    fetchEUNLData 
+    fetchEUNLData,
+    eunlTrendStats 
   } = useAppStore()
   const { isPrivacyMode, getPrivacyUrl, getPublicUrl } = usePrivacyMode()
 
@@ -88,6 +89,7 @@ function App(): React.JSX.Element {
               eunlData={eunlData} 
               onFetchEUNL={handleFetchEUNL}
               loading={loading}
+              eunlTrendStats={eunlTrendStats}
             />
           </>
         )}

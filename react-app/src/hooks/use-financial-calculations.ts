@@ -38,7 +38,7 @@ export function useFinancialCalculations(
     const stocksData = processStocksData(filteredData);
     
     // Calculate EUNL chart data with trend
-    const eunlChartData = calculateExponentialTrend(eunlData);
+    const { data: eunlChartData } = calculateExponentialTrend(eunlData);
     
     // Calculate milestone markers
     const milestoneMarkers = calculateMilestoneMarkers(fullChartData, conditions);

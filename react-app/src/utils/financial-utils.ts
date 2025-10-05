@@ -190,9 +190,10 @@ export function processStocksData(data: Event[]): ChartDataPoint[] {
 
 /**
  * Calculate exponential trend line for EUNL data with confidence intervals
+ * Returns both the enhanced data and trend statistics
  */
-export function calculateExponentialTrend(data: any[]): any[] {
-  if (!data || data.length < 2) return data;
+export function calculateExponentialTrend(data: any[]): { data: any[], trendStats: { annualGrowthRate: number, standardDeviation: number } | null } {
+  if (!data || data.length < 2) return { data, trendStats: null };
 
   // Convert dates to numeric values (days since first date)
   const firstDate = data[0].date;
@@ -202,7 +203,7 @@ export function calculateExponentialTrend(data: any[]): any[] {
     y: item.price
   })).filter(item => item.y !== null);
 
-  if (numericData.length < 2) return data;
+  if (numericData.length < 2) return { data, trendStats: null };
 
   // Calculate exponential regression: y = a * e^(b * x)
   // Using linear regression on ln(y) = ln(a) + b * x
@@ -227,8 +228,11 @@ export function calculateExponentialTrend(data: any[]): any[] {
   const sumSquaredResiduals = residuals.reduce((sum, residual) => sum + residual, 0);
   const standardDeviation = Math.sqrt(sumSquaredResiduals / (n - 2)); // n-2 for degrees of freedom
 
+  // Calculate annual growth rate from daily growth rate (b)
+  const annualGrowthRate = b * 365; // Convert daily growth rate to annual
+
   // Generate trend line data with confidence intervals
-  return data.map(item => {
+  const enhancedData = data.map(item => {
     const x = (item.date.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
     const trend = a * Math.exp(b * x);
     
@@ -247,6 +251,14 @@ export function calculateExponentialTrend(data: any[]): any[] {
       isBelowLowerBound: item.price !== null && item.price < lowerBound
     };
   });
+
+  return {
+    data: enhancedData,
+    trendStats: {
+      annualGrowthRate,
+      standardDeviation
+    }
+  };
 }
 
 /**
@@ -271,9 +283,9 @@ export function calculateCurrentStockEstimate(
   config: Config, 
   currentTime: Date = new Date(),
   chartData?: any[] // Optional chart data with pre-calculated minRequiredContribution
-): { currentEstimate: number; changePerDay: number } {
+): { currentEstimate: number; changePerDay: number; growthPerDay: number; contributionPerDay: number } {
   if (!data || data.length === 0) {
-    return { currentEstimate: 0, changePerDay: 0 };
+    return { currentEstimate: 0, changePerDay: 0, growthPerDay: 0, contributionPerDay: 0 };
   }
 
   // Get the last recorded stock value
@@ -282,7 +294,7 @@ export function calculateCurrentStockEstimate(
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   if (sortedData.length === 0) {
-    return { currentEstimate: 0, changePerDay: 0 };
+    return { currentEstimate: 0, changePerDay: 0, growthPerDay: 0, contributionPerDay: 0 };
   }
 
   const lastRecord = sortedData[0];
@@ -323,11 +335,19 @@ export function calculateCurrentStockEstimate(
   // Final estimate
   const currentEstimate = valueFromGrowth + contributionEffect;
 
-  // Calculate changes
-  const changePerDay = valueFromGrowth * dailyGrowthRate + minimumContribution / 30;
+  // Get planned monthly contribution or fallback to minimum contribution
+  const plannedMonthlyContribution = parseFloat(config.planned_monthly_contribution || '0');
+  const effectiveMonthlyContribution = plannedMonthlyContribution > 0 ? plannedMonthlyContribution : minimumContribution;
+
+  // Calculate separate components for daily changes
+  const growthPerDay = valueFromGrowth * dailyGrowthRate;
+  const contributionPerDay = effectiveMonthlyContribution / 30;
+  const totalChangePerDay = growthPerDay + contributionPerDay;
 
   return {
     currentEstimate,
-    changePerDay
+    changePerDay: totalChangePerDay,
+    growthPerDay,
+    contributionPerDay
   };
 }

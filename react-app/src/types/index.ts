@@ -21,6 +21,7 @@ export interface Config {
   [key: string]: string | undefined;
   investment_goal?: string;
   annual_growth_rate?: string;
+  planned_monthly_contribution?: string;
 }
 
 export interface ChartDataPoint {
@@ -62,6 +63,7 @@ export interface StockChartsProps {
   eunlData: EUNLDataPoint[];
   onFetchEUNL: () => Promise<void>;
   loading: boolean;
+  eunlTrendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
 }
 
 export interface StockChartProps {
@@ -81,6 +83,7 @@ export interface EUNLChartProps {
   showOnlyDataWithStocks: boolean;
   stocksData: Event[];
   viewMode: 'recorded' | 'next2years' | 'full';
+  trendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
 }
 
 export interface MinRequiredContributionsChartProps {

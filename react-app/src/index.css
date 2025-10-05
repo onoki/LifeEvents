@@ -56,3 +56,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .text-goldish {
+    color: #fef08a;
+  }
+}

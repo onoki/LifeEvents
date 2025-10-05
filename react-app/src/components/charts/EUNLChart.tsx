@@ -1,8 +1,9 @@
 import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, Legend } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 import type { EUNLChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
+import { CountUp } from '../UI/countup';
 
 /**
  * EUNL Chart Component
@@ -15,7 +16,8 @@ export function EUNLChart({
   loading, 
   showOnlyDataWithStocks, 
   stocksData, 
-  viewMode 
+  viewMode,
+  trendStats 
 }: EUNLChartProps): React.JSX.Element {
   // Show empty state if no EUNL data
   if (!data || data.length === 0) {
@@ -186,6 +188,25 @@ export function EUNLChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
+      
+      {/* Trend Statistics Display */}
+      {trendStats && (
+        <div className="mt-4 text-sm text-muted-foreground">
+          Calculated trend: <CountUp 
+            key="annual-growth"
+            value={Math.round(trendStats.annualGrowthRate * 100 * 10) / 10} 
+            decimals={1}
+            className="font-semibold text-foreground"
+            suffix=" %"
+          />&nbsp;(± <CountUp 
+            key="standard-deviation"
+            value={Math.round(trendStats.standardDeviation * 100 * 10) / 10} 
+            decimals={1}
+            className="font-semibold text-foreground"
+            suffix=" %"
+          />)
+        </div>
+      )}
     </div>
   );
 }

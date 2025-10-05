@@ -52,9 +52,14 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
       }
       
       // Split minRequiredContribution into area (with data) and line (projection)
+      // Ensure continuity by including the transition point in both area and line
       if (item.date <= lastStockDataDate) {
         // Up to last stock data: show as area
         minRequiredContributionArea = item.minRequiredContribution;
+        // Also include this point in the line to ensure continuity
+        if (item.date.getTime() === lastStockDataDate.getTime()) {
+          minRequiredContributionLine = item.minRequiredContribution;
+        }
       } else {
         // After last stock data: show as line only
         minRequiredContributionLine = item.minRequiredContribution;

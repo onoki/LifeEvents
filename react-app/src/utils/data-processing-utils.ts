@@ -59,10 +59,16 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
       const parts = line.split('\t');
       
       // Check if this looks like a config line (key-value pair)
-      if (parts.length === 2 && !line.match(/^\d{4}-\d{2}-\d{2}/) && !line.includes('condition')) {
+      if (parts.length >= 2 && !line.match(/^\d{4}-\d{2}-\d{2}/) && !line.includes('condition')) {
         const key = parts[0].trim();
         const value = parts[1].trim();
         configData[key] = value;
+        
+        // Debug logging for planned_monthly_contribution
+        if (key === 'planned_monthly_contribution') {
+          console.log('Found planned_monthly_contribution in TSV:', key, '=', value);
+        }
+        
         // Don't set conditionsStartIndex here, let it be found naturally
       } else if (line.includes('condition') && line.includes('explanation_short') && line.includes('explanation_long')) {
         // Found conditions header
@@ -118,6 +124,9 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
     // Normalize and process the data
     return processEventData(event);
   }).filter(event => event.date); // Filter out invalid entries
+  
+  // Debug logging for final config
+  console.log('Final parsed config:', configData);
   
   return { config: configData, conditions: conditionsData, data: parsedData };
 }

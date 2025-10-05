@@ -1,17 +1,28 @@
 import { APP_CONFIG } from '../config/app-config';
 
 /**
+ * Helper function to apply 16:00 transition logic
+ * Only moves to the next day if it's after 16:00 AND it's a workday (Monday-Friday)
+ */
+function applyWorkdayTransition(date: Date): Date {
+  const current = new Date(date);
+  const dayOfWeek = current.getDay();
+  const isWorkday = dayOfWeek >= 1 && dayOfWeek <= 5; // Monday = 1, Tuesday = 2, ..., Friday = 5
+  
+  if (current.getHours() >= 16 && isWorkday) {
+    current.setDate(current.getDate() + 1);
+  }
+  
+  return current;
+}
+
+/**
  * Calculate the number of workdays between two dates
  * Uses 16:00 as the day transition time (workdays decrease at 16:00)
  */
 export function countWorkdays(startDate: Date, endDate: Date): number {
   let count = 0;
-  const current = new Date(startDate);
-  
-  // If start time is 16:00 or later, move to next day
-  if (current.getHours() >= 16) {
-    current.setDate(current.getDate() + 1);
-  }
+  const current = applyWorkdayTransition(startDate);
   
   while (current < endDate) {
     const dayOfWeek = current.getDay();
@@ -31,12 +42,7 @@ export function countWorkdays(startDate: Date, endDate: Date): number {
  */
 export function countWorkdaysWithVacation(startDate: Date, endDate: Date): number {
   let count = 0;
-  const current = new Date(startDate);
-  
-  // If start time is 16:00 or later, move to next day
-  if (current.getHours() >= 16) {
-    current.setDate(current.getDate() + 1);
-  }
+  const current = applyWorkdayTransition(startDate);
   
   while (current < endDate) {
     const dayOfWeek = current.getDay();
