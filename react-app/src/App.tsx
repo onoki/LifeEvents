@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent } from "@/components/UI/card"
-import { Button } from "@/components/UI/button"
-import { KPICards } from './components/KPI/KPICards'
-import { StockCharts } from './components/Charts/StockCharts'
-import { ErrorBoundary } from './components/ErrorBoundary'
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { KPICards } from '@/components/kpi/KPICards'
+import { StockCharts } from '@/components/charts/StockCharts'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useAppStore } from './store/use-app-store'
 import { usePrivacyMode } from './hooks/use-privacy-mode'
 import { APP_CONFIG } from './config/app-config'

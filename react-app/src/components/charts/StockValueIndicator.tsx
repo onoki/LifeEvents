@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CountUp } from '../UI/countup';
+import { CountUp } from '../ui/countup';
 import { calculateCurrentStockEstimate } from '../../utils/financial-utils'; // Updated to include growthPerDay and contributionPerDay
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import type { Event, Config } from '../../types';

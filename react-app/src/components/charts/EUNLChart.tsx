@@ -3,7 +3,7 @@ import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Compos
 import type { EUNLChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
-import { CountUp } from '../UI/countup';
+import { CountUp } from '../ui/countup';
 
 /**
  * EUNL Chart Component

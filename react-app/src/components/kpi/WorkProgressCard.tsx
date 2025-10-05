@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/UI/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useKPICalculations } from '../../hooks/use-kpi-calculations';
 import { formatPercentage } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
