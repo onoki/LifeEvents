@@ -330,14 +330,11 @@ export function calculateCurrentStockEstimate(
     }
   }
   
-  const contributionEffect = minimumContribution * contributionScale;
-
-  // Final estimate
-  const currentEstimate = valueFromGrowth + contributionEffect;
-
   // Get planned monthly contribution or fallback to minimum contribution
   const plannedMonthlyContribution = parseFloat(config.planned_monthly_contribution || '0');
   const effectiveMonthlyContribution = plannedMonthlyContribution > 0 ? plannedMonthlyContribution : minimumContribution;
+  const contributionEffect = effectiveMonthlyContribution * contributionScale;
+  const currentEstimate = valueFromGrowth + contributionEffect;
 
   // Calculate separate components for daily changes
   const growthPerDay = valueFromGrowth * dailyGrowthRate;

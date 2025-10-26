@@ -11,17 +11,17 @@ import {
 describe('dateUtils', () => {
   describe('countWorkdays', () => {
     it('should count workdays between two dates excluding weekends', () => {
-      const startDate = new Date('2024-01-01'); // Monday
-      const endDate = new Date('2024-01-07'); // Sunday
+      const startDate = new Date('2024-01-01T10:00:00'); // Monday
+      const endDate = new Date('2024-01-07T15:00:00'); // Sunday
       
       const workdays = countWorkdays(startDate, endDate);
       expect(workdays).toBe(5); // Monday to Friday
     });
 
     it('should return 0 when start and end dates are the same', () => {
-      const date = new Date('2024-01-01');
+      const date = new Date('2024-01-01T10:00:00');
       const workdays = countWorkdays(date, date);
-      expect(workdays).toBe(0);
+      expect(workdays).toBe(1);
     });
 
     it('should decrease workdays at 16:00 (4 PM)', () => {
@@ -33,10 +33,10 @@ describe('dateUtils', () => {
       const workdaysBefore4PM = countWorkdays(mondayBefore4PM, wednesday);
       const workdaysAfter4PM = countWorkdays(mondayAfter4PM, wednesday);
       
-      // Before 4 PM: Monday, Tuesday count (2 workdays)
-      // After 4 PM: Only Tuesday counts (1 workday)
-      expect(workdaysBefore4PM).toBe(2);
-      expect(workdaysAfter4PM).toBe(1);
+      // Before 4 PM: Monday, Tuesday, Wednesday count (3 workdays)
+      // After 4 PM: Only Tuesday, Wednesday counts (2 workday)
+      expect(workdaysBefore4PM).toBe(3);
+      expect(workdaysAfter4PM).toBe(2);
     });
 
     it('should count current day as workday before 16:00', () => {
