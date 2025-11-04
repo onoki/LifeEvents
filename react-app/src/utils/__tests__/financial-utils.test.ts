@@ -2,6 +2,7 @@ import {
   formatCurrency,
   formatPercentage,
   processStocksData,
+  calculateTargetWithFixedContribution,
 } from '../financial-utils';
 import type { Event } from '../../types';
 
@@ -104,6 +105,95 @@ describe('financial-utils', () => {
     it('should handle empty array', () => {
       const result = processStocksData([]);
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('calculateTargetWithFixedContribution - minRequiredContribution', () => {
+    it('keeps latest minRequiredContribution constant after last known stocks point (zero growth)', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-01'), stocks_in_eur: '1000' },
+        { date: new Date('2024-02-01') },
+        { date: new Date('2024-03-01') },
+        { date: new Date('2024-04-01') },
+      ];
+      const config = {
+        investment_goal: '1300', // Goal close to current for easy math
+        annual_growth_rate: '0',  // Zero growth to hit linear branch
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      // totalMonths = 4 (Jan..Apr). For index 0 (Jan): monthsRemaining = 4 - 0 - 1 = 3
+      // remaining = 1300 - 1000 = 300 => minRequiredContribution = 300 / 3 = 100
+      const expectedMin = 100;
+      expect(result).toHaveLength(4);
+      expect(result[0].minRequiredContribution).toBeCloseTo(expectedMin, 6);
+      expect(result[1].minRequiredContribution).toBeCloseTo(expectedMin, 6);
+      expect(result[2].minRequiredContribution).toBeCloseTo(expectedMin, 6);
+      expect(result[3].minRequiredContribution).toBeCloseTo(expectedMin, 6);
+    });
+
+    it('computes per-point minRequiredContribution up to latest stocks point, then holds constant (zero growth)', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-01'), stocks_in_eur: '1000' }, // index 0
+        { date: new Date('2024-02-01') },                        // index 1 (no value)
+        { date: new Date('2024-03-01'), stocks_in_eur: '1300' }, // index 2 latest stocks
+        { date: new Date('2024-04-01') },                        // index 3 future
+      ];
+      const config = {
+        investment_goal: '1600',
+        annual_growth_rate: '0',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      // totalMonths = 4
+      // index 0: monthsRemaining = 4 - 0 - 1 = 3; remaining = 1600 - 1000 = 600 => 600/3 = 200
+      // index 1: monthsRemaining = 4 - 1 - 1 = 2; currentValue = 0 (missing) => remaining = 1600 - 0 = 1600 => 1600/2 = 800
+      // index 2: monthsRemaining = 4 - 2 - 1 = 1; currentValue = 1300 => remaining = 300 => 300/1 = 300 (latestMin)
+      // index 3: uses latestMin = 300
+      expect(result[0].minRequiredContribution).toBeCloseTo(200, 6);
+      expect(result[1].minRequiredContribution).toBeCloseTo(800, 6);
+      expect(result[2].minRequiredContribution).toBeCloseTo(300, 6);
+      expect(result[3].minRequiredContribution).toBeCloseTo(300, 6);
+    });
+
+    it('computes expected value for current=200000, annual=0.07, monthsRemaining=207, goal=1000000', () => {
+      const latestKnownDate = new Date('2024-01-01');
+      const lastDate = new Date('2041-04-01'); // 207 months after 2024-01
+
+      const events: Event[] = [
+        { date: latestKnownDate, stocks_in_eur: '200000' }, // latest stocks point
+        { date: new Date('2024-02-01') },
+        { date: lastDate }, // final horizon
+      ];
+
+      const config = {
+        investment_goal: '1000000',
+        annual_growth_rate: '0.07',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      // Find index of latest known stocks point in result (should be 0 here)
+      const latestIndex = result.findIndex(r => r.stocks_in_eur !== null && r.stocks_in_eur !== undefined);
+      expect(latestIndex).toBeGreaterThanOrEqual(0);
+
+      // Expected minRequiredContribution
+      const annual = 0.07;
+      const r = annual / 12;
+      const n = 207;
+      const current = 200000;
+      const fvCurrent = current * Math.pow(1 + r, n);
+      const remaining = 1000000 - fvCurrent;
+      const annuityFactor = (Math.pow(1 + r, n) - 1) / r;
+      const expected = Math.max(0, remaining / annuityFactor);
+
+      expect(result[latestIndex].minRequiredContribution!).toBeCloseTo(expected, 6);
+      // And for future points it should hold constant
+      for (let i = latestIndex + 1; i < result.length; i++) {
+        expect(result[i].minRequiredContribution!).toBeCloseTo(expected, 6);
+      }
     });
   });
 });

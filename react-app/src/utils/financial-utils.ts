@@ -11,6 +11,19 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
   const investmentGoal = parseFloat(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
   const annualGrowthRate = parseFloat(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
   const monthlyGrowthRate = annualGrowthRate / 12;
+
+  // Small helpers to avoid duplication and keep logic centralized
+  const pow1p = (rate: number, n: number) => Math.pow(1 + rate, n);
+  const annuityFactor = (rate: number, n: number) => {
+    if (n <= 0) return 0;
+    if (rate === 0) return n;
+    return (pow1p(rate, n) - 1) / rate;
+  };
+  const requiredPayment = (remaining: number, rate: number, n: number) => {
+    if (n <= 0) return 0;
+    if (rate === 0) return remaining / n;
+    return remaining / annuityFactor(rate, n);
+  };
   
   // Sort data by date to ensure proper order
   const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -32,42 +45,23 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
   // Calculate required monthly contribution using future value of annuity formula
   // FV = PMT * [((1 + r)^n - 1) / r] + PV * (1 + r)^n
   // Where: FV = investment goal, PV = present value, r = monthly rate, n = months, PMT = monthly payment
-  const futureValueOfPresentValue = firstValue * Math.pow(1 + monthlyGrowthRate, totalMonths - 1);
+  const futureValueOfPresentValue = firstValue * pow1p(monthlyGrowthRate, totalMonths - 1);
   const remainingToAchieve = investmentGoal - futureValueOfPresentValue;
-  
-  let monthlyContribution = 0;
-  if (totalMonths > 0 && monthlyGrowthRate > 0) {
-    monthlyContribution = remainingToAchieve / ((Math.pow(1 + monthlyGrowthRate, totalMonths - 1) - 1) / monthlyGrowthRate);
-  } else if (totalMonths > 0) {
-    monthlyContribution = remainingToAchieve / (totalMonths - 1);
-  }
+  const monthlyContribution = requiredPayment(remainingToAchieve, monthlyGrowthRate, Math.max(0, totalMonths - 1));
   
   // Find the latest data point that has actual stock values
   const latestDataPoint = sortedData
     .filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0)
     .pop();
   
-  // Calculate minimum required contribution at the latest known data point
+  // Track minimum required contribution derived at the latest known data point
+  // Compute its value within the main loop to avoid duplication/off-by-one.
   let latestMinRequiredContribution = 0;
   let latestDataPointIndex = -1;
   if (latestDataPoint) {
     latestDataPointIndex = sortedData.findIndex(item => 
       item.date.getTime() === latestDataPoint.date.getTime()
     );
-    
-    const latestMonthsFromStart = (latestDataPoint.date.getFullYear() - firstDate.getFullYear()) * 12 + 
-                                 (latestDataPoint.date.getMonth() - firstDate.getMonth());
-    const monthsRemaining = totalMonths - latestMonthsFromStart;
-    const currentValue = parseFloat(latestDataPoint.stocks_in_eur!.toString());
-    const futureValueOfCurrent = currentValue * Math.pow(1 + monthlyGrowthRate, monthsRemaining);
-    const remainingToAchieve = investmentGoal - futureValueOfCurrent;
-    
-    if (monthsRemaining > 0 && monthlyGrowthRate > 0) {
-      latestMinRequiredContribution = remainingToAchieve / ((Math.pow(1 + monthlyGrowthRate, monthsRemaining) - 1) / monthlyGrowthRate);
-    } else if (monthsRemaining > 0) {
-      latestMinRequiredContribution = remainingToAchieve / monthsRemaining;
-    }
-    latestMinRequiredContribution = Math.max(0, latestMinRequiredContribution);
   }
   
   // Process the raw data and add target calculations
@@ -80,8 +74,8 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
                            (item.date.getMonth() - firstDate.getMonth());
     
     // Calculate target value for this month
-    const targetValue = firstValue * Math.pow(1 + monthlyGrowthRate, monthsFromStart) + 
-                       monthlyContribution * ((Math.pow(1 + monthlyGrowthRate, monthsFromStart) - 1) / monthlyGrowthRate);
+    const targetValue = firstValue * pow1p(monthlyGrowthRate, monthsFromStart) + 
+                       monthlyContribution * annuityFactor(monthlyGrowthRate, monthsFromStart);
     
     // Calculate minimum required contribution for this month
     let minRequiredContribution = 0;
@@ -89,16 +83,10 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
       // For points up to and including the latest known data point, calculate normally
       const monthsRemaining = totalMonths - monthsFromStart - 1;
       const currentValue = item.stocks_in_eur ? parseFloat(item.stocks_in_eur.toString()) : 0;
-      const futureValueOfCurrent = currentValue * Math.pow(1 + monthlyGrowthRate, monthsRemaining);
-      const remainingToAchieve = investmentGoal - futureValueOfCurrent;
-      
-      if (monthsRemaining > 0 && monthlyGrowthRate > 0) {
-        minRequiredContribution = remainingToAchieve / ((Math.pow(1 + monthlyGrowthRate, monthsRemaining) - 1) / monthlyGrowthRate);
-      } else if (monthsRemaining > 0) {
-        minRequiredContribution = remainingToAchieve / monthsRemaining;
-      }
-        minRequiredContribution = Math.max(0, minRequiredContribution);
-        latestMinRequiredContribution = minRequiredContribution;
+      const futureValueOfCurrent = currentValue * pow1p(monthlyGrowthRate, monthsRemaining);
+      const remainingToGoal = investmentGoal - futureValueOfCurrent;
+      minRequiredContribution = Math.max(0, requiredPayment(remainingToGoal, monthlyGrowthRate, monthsRemaining));
+      latestMinRequiredContribution = minRequiredContribution;
     } else {
       // For future points (after latest known data point), use the same value as latest
       minRequiredContribution = latestMinRequiredContribution;
