@@ -27,15 +27,23 @@ export function EUNLChart({
           <div>
             <h3 className="text-lg font-semibold">{title}</h3>
           </div>
-          {onFetchEUNL && (
+          <div className="flex items-center gap-2">
+            {onFetchEUNL && (
+              <button
+                onClick={onFetchEUNL}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {loading ? 'Fetching...' : 'Fetch EUNL Data'}
+              </button>
+            )}
             <button
-              onClick={onFetchEUNL}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              onClick={() => window.open(`https://finance.yahoo.com/quote/${APP_CONFIG.API.EUNL_SYMBOL}/`, '_blank', 'noopener,noreferrer')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
             >
-              {loading ? 'Fetching...' : 'Fetch EUNL Data'}
+              View on Yahoo Finance
             </button>
-          )}
+          </div>
         </div>
         <div className="flex items-center justify-center h-[300px] text-muted-foreground">
           <div className="text-center">
@@ -95,15 +103,23 @@ export function EUNLChart({
         <div>
           <h3 className="text-lg font-semibold">{title}</h3>
         </div>
-        {onFetchEUNL && (
+        <div className="flex items-center gap-2">
+          {onFetchEUNL && (
+            <button
+              onClick={onFetchEUNL}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              {loading ? 'Fetching...' : 'Fetch EUNL Data'}
+            </button>
+          )}
           <button
-            onClick={onFetchEUNL}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            onClick={() => window.open(`https://finance.yahoo.com/quote/${APP_CONFIG.API.EUNL_SYMBOL}/`, '_blank', 'noopener,noreferrer')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
           >
-            {loading ? 'Fetching...' : 'Fetch EUNL Data'}
+            View on Yahoo Finance
           </button>
-        )}
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={APP_CONFIG.UI.CHART_HEIGHT}>
         <ComposedChart data={chartData} margin={{ left: -10, right: -10, top: 5, bottom: 5 }}>

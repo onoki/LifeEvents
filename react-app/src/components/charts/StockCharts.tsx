@@ -39,6 +39,14 @@ export function StockCharts({
     milestoneMarkers
   } = useFinancialCalculations(data, config, conditions, eunlData, viewMode);
 
+  // Wrap onFetchEUNL to also set viewMode to 'recorded'
+  const handleFetchEUNL = async (): Promise<void> => {
+    setViewMode('recorded');
+    if (onFetchEUNL) {
+      await onFetchEUNL();
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* View Mode Toggle Control */}
@@ -70,7 +78,7 @@ export function StockCharts({
         <EUNLChart 
           title="EUNL ETF history" 
           data={eunlChartData}
-          onFetchEUNL={onFetchEUNL}
+          onFetchEUNL={handleFetchEUNL}
           loading={loading}
           showOnlyDataWithStocks={viewMode === 'recorded'}
           stocksData={filteredData}
