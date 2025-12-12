@@ -2,14 +2,25 @@ import { APP_CONFIG } from '../config/app-config';
 import type { Event, Config, ChartDataPoint } from '../types';
 
 /**
+ * Parse a numeric string, handling both comma and dot as decimal separators
+ */
+function parseNumeric(value: string | number | undefined | null): number {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === 'number') return value;
+  // Replace comma with dot for decimal separator, remove any thousand separators
+  const normalized = value.toString().trim().replace(/,/g, '.').replace(/\s/g, '');
+  return parseFloat(normalized);
+}
+
+/**
  * Calculate target value with fixed monthly contribution
  */
 export function calculateTargetWithFixedContribution(data: Event[], config: Config): ChartDataPoint[] {
   if (!data || data.length === 0) return [];
   
   // Get parameters
-  const investmentGoal = parseFloat(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
-  const annualGrowthRate = parseFloat(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
+  const investmentGoal = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
+  const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
   const monthlyGrowthRate = annualGrowthRate / 12;
 
   // Small helpers to avoid duplication and keep logic centralized
@@ -33,10 +44,21 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
   const lastDate = sortedData[sortedData.length - 1].date;
   
   // Find the first row that actually has stocks data
-  const firstStocksData = sortedData.find(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
+  const firstStocksData = sortedData.find(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
   if (!firstStocksData) return [];
   
-  const firstValue = parseFloat(firstStocksData.stocks_in_eur!.toString());
+  const firstValue = parseNumeric(firstStocksData.stocks_in_eur!);
+  
+  // Find the first row that has both stocks_in_eur and eunl_rate_to_trend for adjusted calculations
+  const firstAdjustedStocksData = sortedData.find(item => 
+    item.stocks_in_eur && 
+    parseNumeric(item.stocks_in_eur) > 0 &&
+    item.eunl_rate_to_trend && 
+    !isNaN(parseNumeric(item.eunl_rate_to_trend))
+  );
+  const firstAdjustedValue = firstAdjustedStocksData 
+    ? parseNumeric(firstAdjustedStocksData.stocks_in_eur!) * parseNumeric(firstAdjustedStocksData.eunl_rate_to_trend!)
+    : null;
   
   // Calculate total number of months from first to last date
   const totalMonths = (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + 
@@ -51,12 +73,13 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
   
   // Find the latest data point that has actual stock values
   const latestDataPoint = sortedData
-    .filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0)
+    .filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0)
     .pop();
   
   // Track minimum required contribution derived at the latest known data point
   // Compute its value within the main loop to avoid duplication/off-by-one.
   let latestMinRequiredContribution = 0;
+  let latestMinRequiredContributionAdjusted = 0;
   let latestDataPointIndex = -1;
   if (latestDataPoint) {
     latestDataPointIndex = sortedData.findIndex(item => 
@@ -79,24 +102,37 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
     
     // Calculate minimum required contribution for this month
     let minRequiredContribution = 0;
+    let minRequiredContributionAdjusted = 0;
     if (index <= latestDataPointIndex) {
       // For points up to and including the latest known data point, calculate normally
       const monthsRemaining = totalMonths - monthsFromStart - 1;
-      const currentValue = item.stocks_in_eur ? parseFloat(item.stocks_in_eur.toString()) : 0;
+      const currentValue = item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : 0;
       const futureValueOfCurrent = currentValue * pow1p(monthlyGrowthRate, monthsRemaining);
       const remainingToGoal = investmentGoal - futureValueOfCurrent;
       minRequiredContribution = Math.max(0, requiredPayment(remainingToGoal, monthlyGrowthRate, monthsRemaining));
       latestMinRequiredContribution = minRequiredContribution;
+      
+      // Calculate adjusted minimum required contribution using adjusted stock value
+      if (item.stocks_in_eur && item.eunl_rate_to_trend) {
+        const adjustedValue = parseNumeric(item.stocks_in_eur) * parseNumeric(item.eunl_rate_to_trend);
+        if (!isNaN(adjustedValue)) {
+          const futureValueOfAdjusted = adjustedValue * pow1p(monthlyGrowthRate, monthsRemaining);
+          const remainingToGoalAdjusted = investmentGoal - futureValueOfAdjusted;
+          minRequiredContributionAdjusted = Math.max(0, requiredPayment(remainingToGoalAdjusted, monthlyGrowthRate, monthsRemaining));
+          latestMinRequiredContributionAdjusted = minRequiredContributionAdjusted;
+        }
+      }
     } else {
       // For future points (after latest known data point), use the same value as latest
       minRequiredContribution = latestMinRequiredContribution;
+      minRequiredContributionAdjusted = latestMinRequiredContributionAdjusted;
     }
     
     // Calculate minimum contribution line value
     let targetWithMinimumContribution = null;
     if (index === latestDataPointIndex) {
       // Only show this line starting from the last stocks data point
-      targetWithMinimumContribution = parseFloat(item.stocks_in_eur!.toString());
+      targetWithMinimumContribution = parseNumeric(item.stocks_in_eur!);
     } else if (index > latestDataPointIndex) {
       // Continue calculating for future months
       targetWithMinimumContribution = previousMinContributionLineValue * (1 + monthlyGrowthRate) + latestMinRequiredContribution;
@@ -112,7 +148,7 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
     
     if (index === latestDataPointIndex) {
       // Only show these lines starting from the last stocks data point
-      const currentStocksValue = parseFloat(item.stocks_in_eur!.toString());
+      const currentStocksValue = parseNumeric(item.stocks_in_eur!);
       lineWithMinusOnePercentGrowth = currentStocksValue;
       lineWithPlusOnePercentGrowth = currentStocksValue;
     } else if (index > latestDataPointIndex) {
@@ -122,6 +158,17 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
     }
     // For months before the last stocks data point, keep as null
     
+    // Calculate adjusted stock value (stocks_in_eur * eunl_rate_to_trend)
+    // Calculate whenever stocks_in_eur exists and eunl_rate_to_trend is available
+    let stocksInEurAdjusted: number | null = null;
+    if (item.stocks_in_eur && item.eunl_rate_to_trend) {
+      const stocksValue = parseNumeric(item.stocks_in_eur);
+      const eunlRate = parseNumeric(item.eunl_rate_to_trend);
+      if (!isNaN(stocksValue) && !isNaN(eunlRate) && stocksValue > 0) {
+        stocksInEurAdjusted = stocksValue * eunlRate;
+      }
+    }
+    
     const resultItem: ChartDataPoint = {
       ...item,
       dateFormatted: item.date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
@@ -129,16 +176,18 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
       lineWithPlusOnePercentGrowth: lineWithPlusOnePercentGrowth ? Math.max(0, lineWithPlusOnePercentGrowth) : null,
       targetWithMinimumContribution: targetWithMinimumContribution ? Math.max(0, targetWithMinimumContribution) : null,
       lineWithMinusOnePercentGrowth: lineWithMinusOnePercentGrowth ? Math.max(0, lineWithMinusOnePercentGrowth) : null,
-      stocks_in_eur: item.stocks_in_eur ? parseFloat(item.stocks_in_eur.toString()) : null,
+      stocks_in_eur: item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : null,
+      stocks_in_eur_adjusted_for_eunl_trend: stocksInEurAdjusted,
       targetWithFixedContribution: Math.max(0, targetValue),
-      minRequiredContribution: minRequiredContribution
+      minRequiredContribution: minRequiredContribution,
+      minRequiredContributionAdjustedForEUNLTrend: minRequiredContributionAdjusted
     };
 
     // Update previous values for next iteration (only from the last stocks data point onwards)
     if (index >= latestDataPointIndex) {
       if (item.stocks_in_eur) {
         // When we have actual stocks data, reset all previous values to this value
-        const currentStocksValue = parseFloat(item.stocks_in_eur.toString());
+        const currentStocksValue = parseNumeric(item.stocks_in_eur);
         previousMinContributionLineValue = currentStocksValue;
         previousMinusOnePercentValue = currentStocksValue;
         previousPlusOnePercentValue = currentStocksValue;
@@ -171,7 +220,7 @@ export function processStocksData(data: Event[]): ChartDataPoint[] {
     .map(item => ({
       ...item,
       dateFormatted: item.date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
-      stocks_in_eur: parseFloat(item.stocks_in_eur!.toString()) || 0
+      stocks_in_eur: parseNumeric(item.stocks_in_eur!) || 0
     }))
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
@@ -228,12 +277,14 @@ export function calculateExponentialTrend(data: any[]): { data: any[], trendStat
     const confidenceInterval = standardDeviation * trend;
     const upperBound = trend + confidenceInterval;
     const lowerBound = Math.max(0, trend - confidenceInterval); // Don't go below 0 for prices
+    const multiplier = item.price ? trend / item.price : null;
     
     return {
       ...item,
       trend,
       trendUpperBound: upperBound,
       trendLowerBound: lowerBound,
+      multiplier,
       // Add indicators for when price is outside confidence interval
       isAboveUpperBound: item.price !== null && item.price > upperBound,
       isBelowLowerBound: item.price !== null && item.price < lowerBound
@@ -278,7 +329,7 @@ export function calculateCurrentStockEstimate(
 
   // Get the last recorded stock value
   const sortedData = [...data]
-    .filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0)
+    .filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0)
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   if (sortedData.length === 0) {
@@ -286,18 +337,26 @@ export function calculateCurrentStockEstimate(
   }
 
   const lastRecord = sortedData[0];
-  const lastValue = parseFloat(lastRecord.stocks_in_eur!.toString());
   const lastDate = lastRecord.date;
+  
+  // Use adjusted value (stocks_in_eur * eunl_rate_to_trend) if available, otherwise use stocks_in_eur
+  let lastValue = parseNumeric(lastRecord.stocks_in_eur!);
+  if (lastRecord.eunl_rate_to_trend) {
+    const eunlRate = parseNumeric(lastRecord.eunl_rate_to_trend);
+    if (!isNaN(eunlRate)) {
+      lastValue = lastValue * eunlRate;
+    }
+  }
 
   // Get configuration values
-  const annualGrowthRate = parseFloat(config.annual_growth_rate || '0.07');
+  const annualGrowthRate = parseNumeric(config.annual_growth_rate || '0.07');
   const dailyGrowthRate = annualGrowthRate / 365;
 
   // Calculate time difference
   const timeDiffMs = currentTime.getTime() - lastDate.getTime();
   const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
 
-  // Calculate growth from last recorded value
+  // Calculate growth from last recorded value (using adjusted value if available)
   const growthFactor = Math.pow(1 + dailyGrowthRate, timeDiffDays);
   const valueFromGrowth = lastValue * growthFactor;
 
@@ -319,7 +378,7 @@ export function calculateCurrentStockEstimate(
   }
   
   // Get planned monthly contribution or fallback to minimum contribution
-  const plannedMonthlyContribution = parseFloat(config.planned_monthly_contribution || '0');
+  const plannedMonthlyContribution = parseNumeric(config.planned_monthly_contribution || '0');
   const effectiveMonthlyContribution = plannedMonthlyContribution > 0 ? plannedMonthlyContribution : minimumContribution;
   const contributionEffect = effectiveMonthlyContribution * contributionScale;
   const currentEstimate = valueFromGrowth + contributionEffect;

@@ -70,6 +70,7 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
               formatter={(value, name) => {
                 const annualGrowthRate = parseFloat(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
                 const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
+                             name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value adjusted for EUNL trend' :
                              name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
                              name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
                              name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
@@ -145,6 +146,17 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
             strokeWidth={1}
             dot={false}
             activeDot={{ r: 3, fill: '#3b82f6' }}
+          />
+          {/* 4b. Current value adjusted for EUNL trend */}
+          <Line 
+            type="monotone" 
+            dataKey="stocks_in_eur_adjusted_for_eunl_trend"
+            stroke="#8b5cf6" 
+            strokeWidth={1}
+            strokeDasharray="5 5"
+            dot={true}
+            connectNulls={true}
+            activeDot={{ r: 3, fill: '#8b5cf6' }}
           />
           {/* 5. Target with fixed contributions (foreground) */}
           <Line 

@@ -9,6 +9,7 @@ export interface Event {
   duration?: string;
   durationDays?: number;
   stocks_in_eur?: string | number;
+  eunl_rate_to_trend?: string | number;
 }
 
 export interface Condition {
@@ -28,11 +29,13 @@ export interface ChartDataPoint {
   date: Date;
   dateFormatted: string;
   stocks_in_eur?: number | null;
+  stocks_in_eur_adjusted_for_eunl_trend?: number | null;
   targetWithFixedContribution?: number;
   targetWithMinimumContribution?: number | null;
   lineWithMinusOnePercentGrowth?: number | null;
   lineWithPlusOnePercentGrowth?: number | null;
   minRequiredContribution?: number;
+  minRequiredContributionAdjustedForEUNLTrend?: number;
 }
 
 export interface EUNLDataPoint {
@@ -40,6 +43,11 @@ export interface EUNLDataPoint {
   price: number | null;
   dateFormatted: string;
   trend?: number;
+  trendUpperBound?: number;
+  trendLowerBound?: number;
+  multiplier?: number | null;
+  isAboveUpperBound?: boolean;
+  isBelowLowerBound?: boolean;
 }
 
 export interface MilestoneMarker {
@@ -64,6 +72,7 @@ export interface StockChartsProps {
   onFetchEUNL: () => Promise<void>;
   loading: boolean;
   eunlTrendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
+  eunlError?: string | null;
 }
 
 export interface StockChartProps {
@@ -84,6 +93,7 @@ export interface EUNLChartProps {
   stocksData: Event[];
   viewMode: 'recorded' | 'next2years' | 'full';
   trendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
+  eunlError?: string | null;
 }
 
 export interface MinRequiredContributionsChartProps {
@@ -120,6 +130,7 @@ export interface UseDataReturn {
   loadData: (url: string) => Promise<void>;
   eunlData: EUNLDataPoint[];
   fetchEUNLData: () => Promise<void>;
+  eunlError?: string | null;
 }
 
 // API response types

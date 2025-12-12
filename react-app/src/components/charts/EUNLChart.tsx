@@ -17,7 +17,8 @@ export function EUNLChart({
   showOnlyDataWithStocks, 
   stocksData, 
   viewMode,
-  trendStats 
+  trendStats,
+  eunlError
 }: EUNLChartProps): React.JSX.Element {
   // Show empty state if no EUNL data
   if (!data || data.length === 0) {
@@ -45,6 +46,11 @@ export function EUNLChart({
             </button>
           </div>
         </div>
+        {eunlError && (
+          <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {eunlError}
+          </div>
+        )}
         <div className="flex items-center justify-center h-[300px] text-muted-foreground">
           <div className="text-center">
             <div className="text-4xl mb-2">📈</div>
@@ -121,6 +127,11 @@ export function EUNLChart({
           </button>
         </div>
       </div>
+      {eunlError && (
+        <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {eunlError}
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={APP_CONFIG.UI.CHART_HEIGHT}>
         <ComposedChart data={chartData} margin={{ left: -10, right: -10, top: 5, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -145,17 +156,63 @@ export function EUNLChart({
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
               color: 'hsl(var(--popover-foreground))'
             }}
-            formatter={(value, name) => {
-              const formattedValue = formatCurrency(value as number);
+            content={({ active, payload, label }) => {
+              if (!active || !payload || payload.length === 0) {
+                return null;
+              }
+
               const nameMap: { [key: string]: string } = {
                 'price': 'EUNL Price',
                 'trend': 'Trend',
                 'trendUpperBound': 'Standard deviation (+1σ)',
-                'trendLowerBound': 'Standard deviation (-1σ)'
+                'trendLowerBound': 'Standard deviation (-1σ)',
+                'multiplier': 'Multiplier (trend ÷ price)'
               };
-              return [formattedValue, nameMap[name as string] || name];
+
+              // Get the payload item to access multiplier
+              const dataItem = payload[0]?.payload;
+              const multiplier = dataItem?.multiplier;
+
+              return (
+                <div className="rounded-lg border bg-popover p-3 shadow-md">
+                  <p className="mb-2 font-medium">{`Date: ${label}`}</p>
+                  <ul className="space-y-1">
+                    {payload.map((entry, index) => {
+                      const name = entry.dataKey as string;
+                      const value = entry.value as number;
+                      
+                      if (name === 'multiplier') {
+                        const numericValue = typeof value === 'number' ? value : Number(value);
+                        const formattedMultiplier = Number.isFinite(numericValue) ? `${numericValue.toFixed(3)}x` : 'N/A';
+                        return (
+                          <li key={index} className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">{nameMap[name] || name}:</span>
+                            <span className="font-medium">{formattedMultiplier}</span>
+                          </li>
+                        );
+                      }
+
+                      const formattedValue = formatCurrency(value);
+                      return (
+                        <li key={index} className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">{nameMap[name] || name}:</span>
+                          <span className="font-medium">{formattedValue}</span>
+                        </li>
+                      );
+                    })}
+                    {/* Always show multiplier if it exists in the data and isn't already in payload */}
+                    {multiplier !== undefined && multiplier !== null && !payload.some(p => p.dataKey === 'multiplier') && (
+                      <li className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">{nameMap['multiplier']}:</span>
+                        <span className="font-medium">
+                          {Number.isFinite(multiplier) ? `${Number(multiplier).toFixed(3)}x` : 'N/A'}
+                        </span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              );
             }}
-            labelFormatter={(label) => `Date: ${label}`}
           />
           
           

@@ -64,11 +64,6 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
         const value = parts[1].trim();
         configData[key] = value;
         
-        // Debug logging for planned_monthly_contribution
-        if (key === 'planned_monthly_contribution') {
-          console.log('Found planned_monthly_contribution in TSV:', key, '=', value);
-        }
-        
         // Don't set conditionsStartIndex here, let it be found naturally
       } else if (line.includes('condition') && line.includes('explanation_short') && line.includes('explanation_long')) {
         // Found conditions header
@@ -125,9 +120,6 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
     return processEventData(event);
   }).filter(event => event.date); // Filter out invalid entries
   
-  // Debug logging for final config
-  console.log('Final parsed config:', configData);
-  
   return { config: configData, conditions: conditionsData, data: parsedData };
 }
 
@@ -183,16 +175,27 @@ export function getRecentEvents(data: Event[], limit: number = APP_CONFIG.UI.MAX
 /**
  * Filter data based on view mode
  */
+/**
+ * Parse a numeric string, handling both comma and dot as decimal separators
+ */
+function parseNumeric(value: string | number | undefined | null): number {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === 'number') return value;
+  // Replace comma with dot for decimal separator, remove any thousand separators
+  const normalized = value.toString().trim().replace(/,/g, '.').replace(/\s/g, '');
+  return parseFloat(normalized);
+}
+
 export function filterDataByViewMode(
   data: Event[], 
   viewMode: 'recorded' | 'next2years' | 'full'
 ): Event[] {
   if (viewMode === 'recorded') {
     // Show only months with stock data
-    return data.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
+    return data.filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
   } else if (viewMode === 'next2years') {
     // Show recorded data + next 2 years (limit to exactly 2 years after last stock data)
-    const stocksData = data.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
+    const stocksData = data.filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
     if (stocksData.length > 0) {
       const lastStockDate = new Date(stocksData[stocksData.length - 1].date);
       const twoYearsLater = new Date(lastStockDate);

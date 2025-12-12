@@ -18,7 +18,8 @@ export function StockCharts({
   eunlData, 
   onFetchEUNL, 
   loading,
-  eunlTrendStats 
+  eunlTrendStats,
+  eunlError
 }: StockChartsProps): React.JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('next2years');
 
@@ -84,6 +85,7 @@ export function StockCharts({
           stocksData={filteredData}
           viewMode={viewMode}
           trendStats={eunlTrendStats}
+          eunlError={eunlError}
         />
       </div>
     </div>

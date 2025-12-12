@@ -35,6 +35,8 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
       let targetLineValue = null;
       let minRequiredContributionArea = null;
       let minRequiredContributionLine = null;
+      let minRequiredContributionAdjustedArea = null;
+      let minRequiredContributionAdjustedLine = null;
       
       // Calculate target line value based on linear interpolation
       if (index === 0) {
@@ -52,11 +54,11 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
       }
       
       // Split minRequiredContribution into area (with data) and line (projection)
-      // Ensure continuity by including the transition point in both area and line
+      // Include transition point in line to avoid gap
       if (item.date <= lastStockDataDate) {
-        // Up to last stock data: show as area
+        // Up to and including last stock data: show as area
         minRequiredContributionArea = item.minRequiredContribution;
-        // Also include this point in the line to ensure continuity
+        // Include transition point in line for continuity
         if (item.date.getTime() === lastStockDataDate.getTime()) {
           minRequiredContributionLine = item.minRequiredContribution;
         }
@@ -65,11 +67,28 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
         minRequiredContributionLine = item.minRequiredContribution;
       }
       
+      // Split minRequiredContributionAdjustedForEUNLTrend
+      // Up to latest data: show as line (matching StockChart style)
+      // After latest data: show as line (green)
+      if (item.date <= lastStockDataDate) {
+        // Up to and including last stock data: show as line (purple dashed, matching StockChart)
+        minRequiredContributionAdjustedArea = item.minRequiredContributionAdjustedForEUNLTrend;
+        // Include transition point in line for continuity
+        if (item.date.getTime() === lastStockDataDate.getTime()) {
+          minRequiredContributionAdjustedLine = item.minRequiredContributionAdjustedForEUNLTrend;
+        }
+      } else {
+        // After last stock data: show as line only (green)
+        minRequiredContributionAdjustedLine = item.minRequiredContributionAdjustedForEUNLTrend;
+      }
+      
       return {
         ...item,
         targetLine: targetLineValue,
         minRequiredContributionArea,
-        minRequiredContributionLine
+        minRequiredContributionLine,
+        minRequiredContributionAdjustedArea,
+        minRequiredContributionAdjustedLine
       };
     });
     
@@ -107,7 +126,9 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
               }}
               formatter={(value, name) => {
                 const label = name === 'minRequiredContributionArea' ? 'Minimum required monthly contribution' : 
-                             name === 'minRequiredContributionLine' ? 'Minimum required monthly contribution' :
+                             name === 'minRequiredContributionLine' ? 'Target minimum required contribution' :
+                             name === 'minRequiredContributionAdjustedArea' ? 'Monthly contribution adjusted for EUNL trend' :
+                             name === 'minRequiredContributionAdjustedLine' ? 'Target contribution adjusted for EUNL trend' :
                              name === 'targetLine' ? 'Target' : 'Unknown';
                 return [formatCurrency(value as number), label];
               }}
@@ -116,18 +137,36 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
           <Area 
             type="monotone" 
             dataKey="minRequiredContributionArea"
-            stroke="#10b981" 
-            fill="#10b981"
+            stroke="#3b82f6" 
+            fill="#3b82f6"
             fillOpacity={0.3}
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#10b981' }}
+            activeDot={{ r: 3, fill: '#3b82f6' }}
           />
           <Line 
             type="monotone" 
             dataKey="minRequiredContributionLine"
             stroke="#10b981" 
             strokeWidth={1}
+            dot={false}
+            activeDot={{ r: 3, fill: '#10b981' }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="minRequiredContributionAdjustedArea"
+            stroke="#8b5cf6" 
+            strokeWidth={1}
+            strokeDasharray="5 5"
+            dot={true}
+            activeDot={{ r: 3, fill: '#8b5cf6' }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="minRequiredContributionAdjustedLine"
+            stroke="#10b981" 
+            strokeWidth={1}
+            strokeDasharray="5 5"
             dot={false}
             activeDot={{ r: 3, fill: '#10b981' }}
           />
