@@ -2,6 +2,7 @@ import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 import type { StockChartProps, MilestoneMarker } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
+import { parseNumeric } from '../../utils/number-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 import { StockValueIndicator } from './StockValueIndicator';
@@ -17,7 +18,7 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
   const milestoneMarkers: MilestoneMarker[] = [];
   if (conditions && conditions.length > 0) {
     conditions.forEach((condition) => {
-      const conditionValue = parseFloat(condition.condition || '0');
+      const conditionValue = parseNumeric(condition.condition || '0');
       if (!isNaN(conditionValue)) {
         // Find the first data point where targetWithMinimumContribution exceeds the condition
         const milestonePoint = data.find(item => 
@@ -68,7 +69,7 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
                 color: 'hsl(var(--popover-foreground))'
               }}
               formatter={(value, name) => {
-                const annualGrowthRate = parseFloat(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
+                const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
                 const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
                              name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value adjusted for EUNL trend' :
                              name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :

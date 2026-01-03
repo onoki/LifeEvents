@@ -1,5 +1,6 @@
 import type { Event, Condition, Config } from '../types';
 import { APP_CONFIG } from '../config/app-config';
+import { parseNumeric } from './number-utils';
 
 /**
  * Process and normalize event data
@@ -175,17 +176,6 @@ export function getRecentEvents(data: Event[], limit: number = APP_CONFIG.UI.MAX
 /**
  * Filter data based on view mode
  */
-/**
- * Parse a numeric string, handling both comma and dot as decimal separators
- */
-function parseNumeric(value: string | number | undefined | null): number {
-  if (value === null || value === undefined) return NaN;
-  if (typeof value === 'number') return value;
-  // Replace comma with dot for decimal separator, remove any thousand separators
-  const normalized = value.toString().trim().replace(/,/g, '.').replace(/\s/g, '');
-  return parseFloat(normalized);
-}
-
 export function filterDataByViewMode(
   data: Event[], 
   viewMode: 'recorded' | 'next2years' | 'full'
@@ -225,7 +215,7 @@ export function calculateMilestoneMarkers(
   
   if (conditions && conditions.length > 0) {
     conditions.forEach((condition) => {
-      const conditionValue = parseFloat(condition.condition || '0');
+      const conditionValue = parseNumeric(condition.condition || '0');
       if (!isNaN(conditionValue)) {
         // Find the first data point where targetWithMinimumContribution exceeds the condition
         const milestonePoint = chartData.find(item => 
