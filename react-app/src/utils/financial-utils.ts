@@ -42,18 +42,7 @@ export function calculateTargetWithFixedContribution(
   if (!firstStocksData) return [];
   
   const firstValue = parseNumeric(firstStocksData.stocks_in_eur!);
-  
-  // Find the first row that has both stocks_in_eur and eunl_rate_to_trend for adjusted calculations
-  const firstAdjustedStocksData = sortedData.find(item => 
-    item.stocks_in_eur && 
-    parseNumeric(item.stocks_in_eur) > 0 &&
-    item.eunl_rate_to_trend && 
-    !isNaN(parseNumeric(item.eunl_rate_to_trend))
-  );
-  const firstAdjustedValue = firstAdjustedStocksData 
-    ? parseNumeric(firstAdjustedStocksData.stocks_in_eur!) * parseNumeric(firstAdjustedStocksData.eunl_rate_to_trend!)
-    : null;
-  
+
   // Calculate total number of months from first to last date
   const totalMonths = (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + 
                       (lastDate.getMonth() - firstDate.getMonth()) + 1;

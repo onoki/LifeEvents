@@ -14,6 +14,7 @@ import { StockValueIndicator } from './StockValueIndicator';
 export function StockChart({
   title,
   data,
+  progressAxisData,
   dataKey,
   config,
   conditions,
@@ -21,6 +22,69 @@ export function StockChart({
   rawData
 }: StockChartProps): React.JSX.Element {
   const { isPrivacyMode } = usePrivacyMode();
+  const progressAxis = React.useMemo(() => {
+    const sourceData = progressAxisData && progressAxisData.length > 0 ? progressAxisData : data;
+    if (!sourceData || sourceData.length === 0) {
+      return { ticks: [] as number[], entries: [] as Array<{ value: number; label: string }>, labelByValue: new Map<number, string>(), domain: [0, 0] as [number, number] };
+    }
+
+    const lastIndex = sourceData.length - 1;
+    const percentSteps = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    const entries = percentSteps
+      .map((percent) => {
+        const index = Math.round((percent / 100) * lastIndex);
+        const value = sourceData[index]?.targetWithFixedContribution;
+        if (typeof value !== 'number' || Number.isNaN(value)) return null;
+        return { value, label: `${percent} %` };
+      })
+      .filter((entry): entry is { value: number; label: string } => entry !== null);
+
+    if (entries.length === 0) {
+      return { ticks: [] as number[], entries: [] as Array<{ value: number; label: string }>, labelByValue: new Map<number, string>(), domain: [0, 0] as [number, number] };
+    }
+
+    const ticks = entries.map((entry) => entry.value);
+    const min = Math.min(...ticks);
+    const max = Math.max(...ticks);
+    const labelByValue = new Map<number, string>();
+    entries.forEach((entry) => {
+      labelByValue.set(entry.value, entry.label);
+    });
+    return {
+      ticks,
+      entries,
+      labelByValue,
+      domain: [min, max] as [number, number]
+    };
+  }, [data, progressAxisData]);
+  const rightAxisDomain = React.useMemo(() => {
+    const keys: Array<keyof ChartDataPoint> = [
+      'lineWithPlusOnePercentGrowth',
+      'targetWithMinimumContribution',
+      'lineWithTrendGrowth',
+      'lineWithMinusOnePercentGrowth',
+      'stocks_in_eur',
+      'stocks_in_eur_adjusted_for_eunl_trend',
+      'targetWithFixedContribution'
+    ];
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    data.forEach((item) => {
+      keys.forEach((key) => {
+        const value = item[key];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          min = Math.min(min, value);
+          max = Math.max(max, value);
+        }
+      });
+    });
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return [0, 0] as [number, number];
+    }
+    const roundedMin = Math.floor(min / 1000) * 1000;
+    const roundedMax = Math.ceil(max / 1000) * 1000;
+    return [roundedMin, roundedMax] as [number, number];
+  }, [data]);
   const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
     ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (EUNL trend)`
     : 'Growth scenario (EUNL trend)';
@@ -105,10 +169,37 @@ export function StockChart({
             axisLine={{ stroke: 'hsl(var(--border))' }}
           />
           <YAxis 
+            yAxisId="progress"
+            type="number"
+            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+            axisLine={{ stroke: 'hsl(var(--border))' }}
+            ticks={progressAxis.ticks.length > 0 ? progressAxis.ticks : undefined}
+            domain={rightAxisDomain}
+            tickFormatter={(value) => {
+              const numericValue = typeof value === 'number' ? value : parseFloat(String(value));
+              if (Number.isNaN(numericValue)) return '';
+              const directLabel = progressAxis.labelByValue.get(numericValue);
+              if (directLabel) return directLabel;
+              let closestLabel = '';
+              let closestDistance = Number.POSITIVE_INFINITY;
+              progressAxis.entries.forEach((entry) => {
+                const distance = Math.abs(entry.value - numericValue);
+                if (distance < closestDistance) {
+                  closestDistance = distance;
+                  closestLabel = entry.label;
+                }
+              });
+              return closestLabel;
+            }}
+            interval={0}
+            width={46}
+            orientation="left"
+          />
+          <YAxis 
             tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => isPrivacyMode ? '•••' : `${Math.round(value / 1000)}k€`}
-            domain={[(dataMin) => Math.floor(dataMin / 1000) * 1000, (dataMax) => Math.ceil(dataMax / 1000) * 1000]}
+            domain={rightAxisDomain}
             width={40}
             orientation="right"
           />
@@ -229,6 +320,19 @@ export function StockChart({
             strokeWidth={1}
             dot={false}
             activeDot={{ r: 3, fill: '#ef4444' }}
+          />
+          {/* Anchor line for the left progress axis (invisible, same values as targetWithFixedContribution) */}
+          <Line 
+            type="monotone"
+            dataKey="targetWithFixedContribution"
+            yAxisId="progress"
+            stroke="rgba(0, 0, 0, 0)"
+            strokeWidth={1}
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            isAnimationActive={false}
+            tooltipType="none"
           />
         </ComposedChart>
       </ResponsiveContainer>

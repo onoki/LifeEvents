@@ -80,6 +80,7 @@ export interface StockChartsProps {
 export interface StockChartProps {
   title: string;
   data: ChartDataPoint[];
+  progressAxisData?: ChartDataPoint[];
   dataKey: string;
   config: Config;
   conditions: Condition[];

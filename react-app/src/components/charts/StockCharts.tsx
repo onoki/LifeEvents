@@ -65,6 +65,7 @@ export function StockCharts({
         <StockChart 
           title="Owned stocks" 
           data={fullChartData.filter(item => filteredData.some(filteredItem => filteredItem.date.getTime() === item.date.getTime()))}
+          progressAxisData={fullChartData}
           dataKey="stocks_in_eur"
           config={config}
           conditions={conditions}
