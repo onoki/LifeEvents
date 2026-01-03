@@ -34,7 +34,7 @@ export function StockValueIndicator({ data, config, chartData }: StockValueIndic
   if (isPrivacyMode) {
     return (
       <div className="mt-4 text-sm text-muted-foreground">
-        Today's estimate: •••• (+••• €/d +••• €/d = +••• €/d)
+        Today's estimate: •••• (uncorrected ••••); growth +••• €/d, contributions +••• €/d = +••• €/d.
       </div>
     );
   }
@@ -47,7 +47,13 @@ export function StockValueIndicator({ data, config, chartData }: StockValueIndic
         decimals={0}
         className="font-semibold text-foreground"
         suffix=" €"
-      />&nbsp;(growth +<CountUp 
+      />&nbsp;(uncorrected <CountUp
+        key="estimate-uncorrected"
+        value={stockValueEstimate.uncorrectedEstimate}
+        decimals={0}
+        className="font-semibold text-foreground"
+        suffix=" €"
+      />); growth +<CountUp 
         key="growth-per-day"
         value={stockValueEstimate.growthPerDay} 
         decimals={2}
@@ -65,7 +71,7 @@ export function StockValueIndicator({ data, config, chartData }: StockValueIndic
         decimals={2}
         className="font-semibold text-green-600"
         suffix=" €/d"
-      />)
+      />.
     </div>
   );
 }

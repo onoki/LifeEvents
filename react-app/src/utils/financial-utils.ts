@@ -312,9 +312,15 @@ export function calculateCurrentStockEstimate(
   config: Config, 
   currentTime: Date = new Date(),
   chartData?: any[] // Optional chart data with pre-calculated minRequiredContribution
-): { currentEstimate: number; changePerDay: number; growthPerDay: number; contributionPerDay: number } {
+): {
+  currentEstimate: number;
+  uncorrectedEstimate: number;
+  changePerDay: number;
+  growthPerDay: number;
+  contributionPerDay: number;
+} {
   if (!data || data.length === 0) {
-    return { currentEstimate: 0, changePerDay: 0, growthPerDay: 0, contributionPerDay: 0 };
+    return { currentEstimate: 0, uncorrectedEstimate: 0, changePerDay: 0, growthPerDay: 0, contributionPerDay: 0 };
   }
 
   // Get the last recorded stock value
@@ -323,14 +329,15 @@ export function calculateCurrentStockEstimate(
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   if (sortedData.length === 0) {
-    return { currentEstimate: 0, changePerDay: 0, growthPerDay: 0, contributionPerDay: 0 };
+    return { currentEstimate: 0, uncorrectedEstimate: 0, changePerDay: 0, growthPerDay: 0, contributionPerDay: 0 };
   }
 
   const lastRecord = sortedData[0];
   const lastDate = lastRecord.date;
   
+  const baseStocksValue = parseNumeric(lastRecord.stocks_in_eur!);
   // Use adjusted value (stocks_in_eur * eunl_rate_to_trend) if available, otherwise use stocks_in_eur
-  let lastValue = parseNumeric(lastRecord.stocks_in_eur!);
+  let lastValue = baseStocksValue;
   if (lastRecord.eunl_rate_to_trend) {
     const eunlRate = parseNumeric(lastRecord.eunl_rate_to_trend);
     if (!isNaN(eunlRate)) {
@@ -349,6 +356,7 @@ export function calculateCurrentStockEstimate(
   // Calculate growth from last recorded value (using adjusted value if available)
   const growthFactor = Math.pow(1 + dailyGrowthRate, timeDiffDays);
   const valueFromGrowth = lastValue * growthFactor;
+  const uncorrectedValueFromGrowth = baseStocksValue * growthFactor;
 
   // Calculate minimum contribution effect
   // Scale from 0% to 100% over 1 month (30 days)
@@ -372,6 +380,7 @@ export function calculateCurrentStockEstimate(
   const effectiveMonthlyContribution = plannedMonthlyContribution > 0 ? plannedMonthlyContribution : minimumContribution;
   const contributionEffect = effectiveMonthlyContribution * contributionScale;
   const currentEstimate = valueFromGrowth + contributionEffect;
+  const uncorrectedEstimate = uncorrectedValueFromGrowth + contributionEffect;
 
   // Calculate separate components for daily changes
   const growthPerDay = valueFromGrowth * dailyGrowthRate;
@@ -380,6 +389,7 @@ export function calculateCurrentStockEstimate(
 
   return {
     currentEstimate,
+    uncorrectedEstimate,
     changePerDay: totalChangePerDay,
     growthPerDay,
     contributionPerDay
