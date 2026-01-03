@@ -25,12 +25,13 @@ export function useFinancialCalculations(
   config: Config,
   conditions: Condition[],
   eunlData: EUNLDataPoint[],
-  viewMode: ViewMode
+  viewMode: ViewMode,
+  trendAnnualGrowthRate?: number | null
 ): FinancialCalculations {
   
   const calculations = useMemo((): FinancialCalculations => {
     // Always calculate with full data range for consistent target lines
-    const fullChartData = calculateTargetWithFixedContribution(data, config);
+    const fullChartData = calculateTargetWithFixedContribution(data, config, trendAnnualGrowthRate);
     const fullStocksData = processStocksData(data);
     
     // Filter data based on view mode (only for display)
@@ -51,7 +52,7 @@ export function useFinancialCalculations(
       eunlChartData,
       milestoneMarkers,
     };
-  }, [data, config, conditions, eunlData, viewMode]);
+  }, [data, config, conditions, eunlData, viewMode, trendAnnualGrowthRate]);
 
   return calculations;
 }

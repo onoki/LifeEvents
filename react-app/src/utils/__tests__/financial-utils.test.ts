@@ -195,5 +195,24 @@ describe('financial-utils', () => {
         expect(result[i].minRequiredContribution!).toBeCloseTo(expected, 6);
       }
     });
+
+    it('uses adjusted start + adjusted contribution so projections still reach the goal (zero growth)', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-01'), stocks_in_eur: '100', eunl_rate_to_trend: '2' },
+        { date: new Date('2024-02-01') },
+        { date: new Date('2024-03-01') },
+      ];
+      const config = {
+        investment_goal: '260',
+        annual_growth_rate: '0',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      expect(result).toHaveLength(3);
+      expect(result[0].targetWithMinimumContribution).toBeCloseTo(200, 6);
+      expect(result[1].targetWithMinimumContribution).toBeCloseTo(230, 6);
+      expect(result[2].targetWithMinimumContribution).toBeCloseTo(260, 6);
+    });
   });
 });

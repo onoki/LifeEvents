@@ -34,6 +34,7 @@ export interface ChartDataPoint {
   targetWithMinimumContribution?: number | null;
   lineWithMinusOnePercentGrowth?: number | null;
   lineWithPlusOnePercentGrowth?: number | null;
+  lineWithTrendGrowth?: number | null;
   minRequiredContribution?: number;
   minRequiredContributionAdjustedForEUNLTrend?: number;
 }
@@ -82,6 +83,7 @@ export interface StockChartProps {
   dataKey: string;
   config: Config;
   conditions: Condition[];
+  trendAnnualGrowthRate?: number | null;
   rawData?: Event[];
 }
 

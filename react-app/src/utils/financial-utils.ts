@@ -5,7 +5,11 @@ import { parseNumeric } from './number-utils';
 /**
  * Calculate target value with fixed monthly contribution
  */
-export function calculateTargetWithFixedContribution(data: Event[], config: Config): ChartDataPoint[] {
+export function calculateTargetWithFixedContribution(
+  data: Event[],
+  config: Config,
+  trendAnnualGrowthRate?: number | null
+): ChartDataPoint[] {
   if (!data || data.length === 0) return [];
   
   // Get parameters
@@ -71,6 +75,7 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
   let latestMinRequiredContribution = 0;
   let latestMinRequiredContributionAdjusted = 0;
   let latestDataPointIndex = -1;
+  let projectionMinRequiredContribution = 0;
   if (latestDataPoint) {
     latestDataPointIndex = sortedData.findIndex(item => 
       item.date.getTime() === latestDataPoint.date.getTime()
@@ -81,6 +86,7 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
   let previousMinContributionLineValue = 0;
   let previousMinusOnePercentValue = 0;
   let previousPlusOnePercentValue = 0;
+  let previousTrendGrowthValue = 0;
 
   const result = sortedData.map((item, index) => {
     const monthsFromStart = (item.date.getFullYear() - firstDate.getFullYear()) * 12 + 
@@ -118,14 +124,31 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
       minRequiredContributionAdjusted = latestMinRequiredContributionAdjusted;
     }
     
+    const currentStocksValue = item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : 0;
+    const currentAdjustedValue = item.stocks_in_eur && item.eunl_rate_to_trend
+      ? currentStocksValue * parseNumeric(item.eunl_rate_to_trend)
+      : null;
+    const startValueForProjections = !isNaN(currentAdjustedValue as number) && currentAdjustedValue !== null
+      ? currentAdjustedValue
+      : currentStocksValue;
+
+    // Decide whether projections should use adjusted contributions at the latest data point
+    if (index === latestDataPointIndex) {
+      if (currentAdjustedValue !== null && !isNaN(currentAdjustedValue)) {
+        projectionMinRequiredContribution = latestMinRequiredContributionAdjusted;
+      } else {
+        projectionMinRequiredContribution = latestMinRequiredContribution;
+      }
+    }
+
     // Calculate minimum contribution line value
     let targetWithMinimumContribution = null;
     if (index === latestDataPointIndex) {
       // Only show this line starting from the last stocks data point
-      targetWithMinimumContribution = parseNumeric(item.stocks_in_eur!);
+      targetWithMinimumContribution = startValueForProjections;
     } else if (index > latestDataPointIndex) {
       // Continue calculating for future months
-      targetWithMinimumContribution = previousMinContributionLineValue * (1 + monthlyGrowthRate) + latestMinRequiredContribution;
+      targetWithMinimumContribution = previousMinContributionLineValue * (1 + monthlyGrowthRate) + projectionMinRequiredContribution;
     }
     // For months before the last stocks data point, keep as null
     
@@ -135,16 +158,23 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
     
     let lineWithMinusOnePercentGrowth = null;
     let lineWithPlusOnePercentGrowth = null;
+    let lineWithTrendGrowth = null;
     
     if (index === latestDataPointIndex) {
       // Only show these lines starting from the last stocks data point
-      const currentStocksValue = parseNumeric(item.stocks_in_eur!);
-      lineWithMinusOnePercentGrowth = currentStocksValue;
-      lineWithPlusOnePercentGrowth = currentStocksValue;
+      lineWithMinusOnePercentGrowth = startValueForProjections;
+      lineWithPlusOnePercentGrowth = startValueForProjections;
+      if (trendAnnualGrowthRate !== undefined && trendAnnualGrowthRate !== null) {
+        lineWithTrendGrowth = startValueForProjections;
+      }
     } else if (index > latestDataPointIndex) {
       // Continue calculating for future months
-      lineWithMinusOnePercentGrowth = previousMinusOnePercentValue * (1 + monthlyGrowthRateMinusOne) + latestMinRequiredContribution;
-      lineWithPlusOnePercentGrowth = previousPlusOnePercentValue * (1 + monthlyGrowthRatePlusOne) + latestMinRequiredContribution;
+      lineWithMinusOnePercentGrowth = previousMinusOnePercentValue * (1 + monthlyGrowthRateMinusOne) + projectionMinRequiredContribution;
+      lineWithPlusOnePercentGrowth = previousPlusOnePercentValue * (1 + monthlyGrowthRatePlusOne) + projectionMinRequiredContribution;
+      if (trendAnnualGrowthRate !== undefined && trendAnnualGrowthRate !== null) {
+        const monthlyTrendGrowthRate = trendAnnualGrowthRate / 12;
+        lineWithTrendGrowth = previousTrendGrowthValue * (1 + monthlyTrendGrowthRate) + projectionMinRequiredContribution;
+      }
     }
     // For months before the last stocks data point, keep as null
     
@@ -162,8 +192,9 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
     const resultItem: ChartDataPoint = {
       ...item,
       dateFormatted: item.date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
-      // Tooltip order: 1. 8% growth scenario, 2. Target with minimum contributions, 3. 6% growth scenario, 4. Current value, 5. Target with fixed contributions
+      // Tooltip order: 1. 8% growth scenario, 2. Target with minimum contributions, 3. Calculated trend, 4. 6% growth scenario, 5. Current value, 6. Target with fixed contributions
       lineWithPlusOnePercentGrowth: lineWithPlusOnePercentGrowth ? Math.max(0, lineWithPlusOnePercentGrowth) : null,
+      lineWithTrendGrowth: lineWithTrendGrowth ? Math.max(0, lineWithTrendGrowth) : null,
       targetWithMinimumContribution: targetWithMinimumContribution ? Math.max(0, targetWithMinimumContribution) : null,
       lineWithMinusOnePercentGrowth: lineWithMinusOnePercentGrowth ? Math.max(0, lineWithMinusOnePercentGrowth) : null,
       stocks_in_eur: item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : null,
@@ -177,10 +208,12 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
     if (index >= latestDataPointIndex) {
       if (item.stocks_in_eur) {
         // When we have actual stocks data, reset all previous values to this value
-        const currentStocksValue = parseNumeric(item.stocks_in_eur);
-        previousMinContributionLineValue = currentStocksValue;
-        previousMinusOnePercentValue = currentStocksValue;
-        previousPlusOnePercentValue = currentStocksValue;
+        previousMinContributionLineValue = startValueForProjections;
+        previousMinusOnePercentValue = startValueForProjections;
+        previousPlusOnePercentValue = startValueForProjections;
+        if (trendAnnualGrowthRate !== undefined && trendAnnualGrowthRate !== null) {
+          previousTrendGrowthValue = startValueForProjections;
+        }
       } else {
         // When we don't have stocks data, update each line's previous value with its own calculated value
         if (targetWithMinimumContribution !== null) {
@@ -191,6 +224,9 @@ export function calculateTargetWithFixedContribution(data: Event[], config: Conf
         }
         if (lineWithPlusOnePercentGrowth !== null) {
           previousPlusOnePercentValue = lineWithPlusOnePercentGrowth;
+        }
+        if (lineWithTrendGrowth !== null) {
+          previousTrendGrowthValue = lineWithTrendGrowth;
         }
       }
     }

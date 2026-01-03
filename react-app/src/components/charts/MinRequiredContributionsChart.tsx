@@ -173,10 +173,10 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
           <Line 
             type="monotone" 
             dataKey="targetLine"
-            stroke="#ef4444" 
+            stroke="#f59e0b" 
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 4, fill: '#ef4444' }}
+            activeDot={{ r: 4, fill: '#f59e0b' }}
           />
         </AreaChart>
       </ResponsiveContainer>

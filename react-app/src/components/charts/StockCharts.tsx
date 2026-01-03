@@ -38,7 +38,14 @@ export function StockCharts({
     filteredData,
     eunlChartData,
     milestoneMarkers
-  } = useFinancialCalculations(data, config, conditions, eunlData, viewMode);
+  } = useFinancialCalculations(
+    data,
+    config,
+    conditions,
+    eunlData,
+    viewMode,
+    eunlTrendStats?.annualGrowthRate
+  );
 
   // Wrap onFetchEUNL to also set viewMode to 'recorded'
   const handleFetchEUNL = async (): Promise<void> => {
@@ -61,6 +68,7 @@ export function StockCharts({
           dataKey="stocks_in_eur"
           config={config}
           conditions={conditions}
+          trendAnnualGrowthRate={eunlTrendStats?.annualGrowthRate ?? null}
           rawData={data}
         />
         

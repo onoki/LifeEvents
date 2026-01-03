@@ -11,8 +11,19 @@ import { StockValueIndicator } from './StockValueIndicator';
  * Stock Chart Component
  * Displays stock value progression with target lines and milestone markers
  */
-export function StockChart({ title, data, dataKey, config, conditions, rawData }: StockChartProps): React.JSX.Element {
+export function StockChart({
+  title,
+  data,
+  dataKey,
+  config,
+  conditions,
+  trendAnnualGrowthRate,
+  rawData
+}: StockChartProps): React.JSX.Element {
   const { isPrivacyMode } = usePrivacyMode();
+  const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
+    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (EUNL trend)`
+    : 'Growth scenario (EUNL trend)';
   
   // Calculate milestone markers for conditions
   const milestoneMarkers: MilestoneMarker[] = [];
@@ -93,6 +104,7 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
                              name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
                              name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
                              name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
+                             name === 'lineWithTrendGrowth' ? trendGrowthLabel :
                              'Unknown';
                 return [formatCurrency(value as number), label];
               }}
@@ -115,6 +127,16 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
             strokeWidth={1}
             dot={false}
             activeDot={{ r: 3, fill: '#10b981' }}
+          />
+          {/* 2b. Calculated trend growth scenario */}
+          <Line 
+            type="monotone" 
+            dataKey="lineWithTrendGrowth"
+            stroke="#06b6d4" 
+            strokeWidth={1}
+            dot={false}
+            activeDot={{ r: 3, fill: '#06b6d4' }}
+            hide={data.every(item => item.lineWithTrendGrowth == null)}
           />
           {milestoneMarkers.map((marker) => {
             const color = marker.achieved ? '#10b981' : '#f59e0b';
