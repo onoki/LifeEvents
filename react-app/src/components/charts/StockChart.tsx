@@ -1,6 +1,6 @@
 import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, ReferenceDot, Label } from 'recharts';
-import type { StockChartProps, MilestoneMarker } from '../../types';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, ReferenceDot, ReferenceLine, Label } from 'recharts';
+import type { StockChartProps, MilestoneMarker, ChartDataPoint } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
@@ -24,6 +24,31 @@ export function StockChart({
   const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
     ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (EUNL trend)`
     : 'Growth scenario (EUNL trend)';
+  const TooltipCursor = (props: {
+    points?: Array<{ x: number; y: number }>;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    stroke?: string;
+    coordinate?: { x: number; y: number };
+  }) => {
+    const { points, x, y, width, height, stroke, coordinate } = props;
+    const cursorX = coordinate?.x ?? (points && points.length > 0 ? points[0].x : x);
+    if (cursorX === undefined || width === undefined || height === undefined) return null;
+    const cursorStroke = stroke || 'hsl(var(--border))';
+    return (
+      <g>
+        <line x1={cursorX} x2={cursorX} y1={0} y2={height} stroke={cursorStroke} strokeDasharray="3 3" />
+      </g>
+    );
+  };
+  const latestAdjustedValue = React.useMemo(() => {
+    const latestWithAdjusted = [...data]
+      .reverse()
+      .find((item) => typeof item.stocks_in_eur_adjusted_for_eunl_trend === 'number');
+    return latestWithAdjusted?.stocks_in_eur_adjusted_for_eunl_trend ?? null;
+  }, [data]);
   
   // Calculate milestone markers for conditions
   const milestoneMarkers: MilestoneMarker[] = [];
@@ -108,7 +133,11 @@ export function StockChart({
                              'Unknown';
                 return [formatCurrency(value as number), label];
               }}
+              cursor={<TooltipCursor />}
             />
+          )}
+          {latestAdjustedValue !== null && (
+            <ReferenceLine y={latestAdjustedValue} stroke="#6b7280" strokeDasharray="4 4" ifOverflow="extendDomain" />
           )}
           {/* 1. 8% growth scenario (background) */}
           <Line 
