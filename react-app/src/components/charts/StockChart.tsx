@@ -1,5 +1,5 @@
 import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, ReferenceDot, Label } from 'recharts';
 import type { StockChartProps, MilestoneMarker } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
@@ -20,23 +20,40 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
     conditions.forEach((condition) => {
       const conditionValue = parseNumeric(condition.condition || '0');
       if (!isNaN(conditionValue)) {
-        // Find the first data point where targetWithMinimumContribution exceeds the condition
-        const milestonePoint = data.find(item => 
-          item.targetWithMinimumContribution && 
+        const achievedPoint = data.find(item => 
+          typeof item.stocks_in_eur_adjusted_for_eunl_trend === 'number' &&
+          item.stocks_in_eur_adjusted_for_eunl_trend >= conditionValue
+        );
+
+        if (achievedPoint) {
+          milestoneMarkers.push({
+            x: achievedPoint.dateFormatted,
+            y: conditionValue,
+            label: condition.explanation_short || 'Unknown',
+            condition: conditionValue,
+            achieved: true
+          });
+          return;
+        }
+
+        const targetPoint = data.find(item => 
+          typeof item.targetWithMinimumContribution === 'number' &&
           item.targetWithMinimumContribution >= conditionValue
         );
-        
-        if (milestonePoint && milestonePoint.targetWithMinimumContribution) {
+
+        if (targetPoint) {
           milestoneMarkers.push({
-            x: milestonePoint.dateFormatted,
-            y: milestonePoint.targetWithMinimumContribution,
+            x: targetPoint.dateFormatted,
+            y: conditionValue,
             label: condition.explanation_short || 'Unknown',
-            condition: conditionValue
+            condition: conditionValue,
+            achieved: false
           });
         }
       }
     });
   }
+
   
   return (
     <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
@@ -96,38 +113,32 @@ export function StockChart({ title, data, dataKey, config, conditions, rawData }
             dataKey="targetWithMinimumContribution"
             stroke="#10b981" 
             strokeWidth={1}
-            dot={(props) => {
-              const { cx, cy, payload } = props;
-              const milestone = milestoneMarkers.find(m => m.x === payload.dateFormatted);
-              
-              if (milestone) {
-                return (
-                  <g key={`milestone-${milestone.x}-${milestone.condition}`}>
-                    <circle 
-                      cx={cx} 
-                      cy={cy} 
-                      r={6} 
-                      fill="#f59e0b" 
-                      stroke="#ffffff" 
-                      strokeWidth={2}
-                    />
-                    <text 
-                      x={cx} 
-                      y={cy - 15} 
-                      textAnchor="middle" 
-                      fill="#f59e0b" 
-                      fontSize="10" 
-                      fontWeight="bold"
-                    >
-                      {isPrivacyMode ? 'Reward' : milestone.label}
-                    </text>
-                  </g>
-                );
-              }
-              return <circle key={`empty-${cx}-${cy}`} cx={cx} cy={cy} r={0} fill="transparent" />;
-            }}
+            dot={false}
             activeDot={{ r: 3, fill: '#10b981' }}
           />
+          {milestoneMarkers.map((marker) => {
+            const color = marker.achieved ? '#10b981' : '#f59e0b';
+            return (
+              <ReferenceDot
+                key={`milestone-${marker.x}-${marker.condition}`}
+                x={marker.x}
+                y={marker.y}
+                r={6}
+                fill={color}
+                stroke="#ffffff"
+                strokeWidth={2}
+                ifOverflow="extendDomain"
+              >
+                <Label
+                  value={isPrivacyMode ? 'Reward' : marker.label}
+                  position="top"
+                  fill={color}
+                  fontSize={10}
+                  fontWeight="bold"
+                />
+              </ReferenceDot>
+            );
+          })}
           {/* 3. 6% growth scenario */}
           <Line 
             type="monotone" 

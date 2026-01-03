@@ -55,6 +55,7 @@ export interface MilestoneMarker {
   y: number;
   label: string;
   condition: number;
+  achieved?: boolean;
 }
 
 // Component prop types

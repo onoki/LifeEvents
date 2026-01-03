@@ -65,7 +65,7 @@ export function StockCharts({
         />
         
         {/* Conditions table below the chart */}
-        <ConditionsTable conditions={conditions} />
+        <ConditionsTable conditions={conditions} events={data} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-6 mb-8">
