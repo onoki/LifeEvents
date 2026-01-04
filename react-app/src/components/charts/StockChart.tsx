@@ -114,11 +114,15 @@ export function StockChart({
       </g>
     );
   };
-  const latestAdjustedValue = React.useMemo(() => {
+  const latestAdjustedPoint = React.useMemo(() => {
     const latestWithAdjusted = [...data]
       .reverse()
       .find((item) => typeof item.stocks_in_eur_adjusted_for_eunl_trend === 'number');
-    return latestWithAdjusted?.stocks_in_eur_adjusted_for_eunl_trend ?? null;
+    if (!latestWithAdjusted) return null;
+    return {
+      x: latestWithAdjusted.dateFormatted,
+      y: latestWithAdjusted.stocks_in_eur_adjusted_for_eunl_trend as number
+    };
   }, [data]);
   
   // Calculate milestone markers for conditions
@@ -234,8 +238,8 @@ export function StockChart({
               cursor={<TooltipCursor />}
             />
           )}
-          {latestAdjustedValue !== null && (
-            <ReferenceLine y={latestAdjustedValue} stroke="#6b7280" strokeDasharray="4 4" ifOverflow="extendDomain" />
+          {latestAdjustedPoint !== null && (
+            <ReferenceLine y={latestAdjustedPoint.y} stroke="#6b7280" strokeDasharray="4 4" ifOverflow="extendDomain" />
           )}
           {shouldShowInvestmentGoalLine && investmentGoal !== null && (
             <ReferenceLine y={investmentGoal} stroke="#6b7280" strokeDasharray="4 4" />
@@ -322,6 +326,18 @@ export function StockChart({
             connectNulls={true}
             activeDot={{ r: 3, fill: '#8b5cf6' }}
           />
+          {latestAdjustedPoint !== null && (
+            <ReferenceDot
+              x={latestAdjustedPoint.x}
+              y={latestAdjustedPoint.y}
+              r={4}
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth={1.25}
+              ifOverflow="extendDomain"
+              className="pulse-ring"
+            />
+          )}
           {/* 5. Target with fixed contributions (foreground) */}
           <Line 
             type="monotone" 

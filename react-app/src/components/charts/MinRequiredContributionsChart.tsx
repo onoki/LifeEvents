@@ -1,5 +1,5 @@
 import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceDot } from 'recharts';
 import type { MinRequiredContributionsChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
@@ -94,6 +94,16 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
     
     return enhancedData;
   }, [data]);
+  const latestAdjustedContributionPoint = React.useMemo(() => {
+    const latestWithAdjusted = [...chartData]
+      .reverse()
+      .find((item) => typeof item.minRequiredContributionAdjustedArea === 'number');
+    if (!latestWithAdjusted) return null;
+    return {
+      x: latestWithAdjusted.dateFormatted,
+      y: latestWithAdjusted.minRequiredContributionAdjustedArea as number
+    };
+  }, [chartData]);
 
   return (
     <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
@@ -161,6 +171,18 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
             dot={true}
             activeDot={{ r: 3, fill: '#8b5cf6' }}
           />
+          {latestAdjustedContributionPoint !== null && (
+            <ReferenceDot
+              x={latestAdjustedContributionPoint.x}
+              y={latestAdjustedContributionPoint.y}
+              r={4}
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth={1.25}
+              ifOverflow="extendDomain"
+              className="pulse-ring"
+            />
+          )}
           <Line 
             type="monotone" 
             dataKey="minRequiredContributionAdjustedLine"
