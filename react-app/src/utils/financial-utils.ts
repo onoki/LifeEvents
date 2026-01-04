@@ -94,7 +94,7 @@ export function calculateTargetWithFixedContribution(
       const currentValue = item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : 0;
       const futureValueOfCurrent = currentValue * pow1p(monthlyGrowthRate, monthsRemaining);
       const remainingToGoal = investmentGoal - futureValueOfCurrent;
-      minRequiredContribution = Math.max(0, requiredPayment(remainingToGoal, monthlyGrowthRate, monthsRemaining));
+      minRequiredContribution = requiredPayment(remainingToGoal, monthlyGrowthRate, monthsRemaining);
       latestMinRequiredContribution = minRequiredContribution;
       
       // Calculate adjusted minimum required contribution using adjusted stock value
@@ -103,7 +103,7 @@ export function calculateTargetWithFixedContribution(
         if (!isNaN(adjustedValue)) {
           const futureValueOfAdjusted = adjustedValue * pow1p(monthlyGrowthRate, monthsRemaining);
           const remainingToGoalAdjusted = investmentGoal - futureValueOfAdjusted;
-          minRequiredContributionAdjusted = Math.max(0, requiredPayment(remainingToGoalAdjusted, monthlyGrowthRate, monthsRemaining));
+          minRequiredContributionAdjusted = requiredPayment(remainingToGoalAdjusted, monthlyGrowthRate, monthsRemaining);
           latestMinRequiredContributionAdjusted = minRequiredContributionAdjusted;
         }
       }

@@ -47,9 +47,7 @@ export function StockCharts({
     eunlTrendStats?.annualGrowthRate
   );
 
-  // Wrap onFetchEUNL to also set viewMode to 'recorded'
   const handleFetchEUNL = async (): Promise<void> => {
-    setViewMode('recorded');
     if (onFetchEUNL) {
       await onFetchEUNL();
     }

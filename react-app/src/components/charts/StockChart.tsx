@@ -85,6 +85,13 @@ export function StockChart({
     const roundedMax = Math.ceil(max / 1000) * 1000;
     return [roundedMin, roundedMax] as [number, number];
   }, [data]);
+  const investmentGoal = React.useMemo(() => {
+    const parsed = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [config.investment_goal]);
+  const shouldShowInvestmentGoalLine = investmentGoal !== null
+    && investmentGoal >= rightAxisDomain[0]
+    && investmentGoal <= rightAxisDomain[1];
   const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
     ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (EUNL trend)`
     : 'Growth scenario (EUNL trend)';
@@ -198,7 +205,7 @@ export function StockChart({
           <YAxis 
             tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            tickFormatter={(value) => isPrivacyMode ? '•••' : `${Math.round(value / 1000)}k€`}
+            tickFormatter={(value) => isPrivacyMode ? '•••' : `${Math.round(value / 1000)}k €`}
             domain={rightAxisDomain}
             width={40}
             orientation="right"
@@ -229,6 +236,9 @@ export function StockChart({
           )}
           {latestAdjustedValue !== null && (
             <ReferenceLine y={latestAdjustedValue} stroke="#6b7280" strokeDasharray="4 4" ifOverflow="extendDomain" />
+          )}
+          {shouldShowInvestmentGoalLine && investmentGoal !== null && (
+            <ReferenceLine y={investmentGoal} stroke="#6b7280" strokeDasharray="4 4" />
           )}
           {/* 1. 8% growth scenario (background) */}
           <Line 

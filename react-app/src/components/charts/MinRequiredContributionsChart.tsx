@@ -112,7 +112,7 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => isPrivacyMode ? '•••' : formatCurrency(value)}
-            domain={[(dataMin) => Math.min(dataMin, 0), 'dataMax']}
+            domain={['dataMin', 'dataMax']}
             orientation="right"
           />
           {!isPrivacyMode && (
