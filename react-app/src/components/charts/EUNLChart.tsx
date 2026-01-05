@@ -4,6 +4,7 @@ import type { EUNLChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
 import { CountUp } from '../ui/countup';
+import { ChartLegend } from './ChartLegend';
 
 /**
  * EUNL Chart Component
@@ -20,6 +21,32 @@ export function EUNLChart({
   trendStats,
   eunlError
 }: EUNLChartProps): React.JSX.Element {
+  const legendItems = React.useMemo(() => ([
+    {
+      label: 'EUNL Price',
+      description: 'The actual price of one MSCI World ETF (EUNL).',
+      color: '#06b6d4',
+      variant: 'area'
+    },
+    {
+      label: 'Trend',
+      description: 'Price trend from the whole history of EUNL.',
+      color: '#ef4444',
+      variant: 'line'
+    },
+    {
+      label: 'Standard deviation',
+      description: 'Standard deviation of the price from the whole history of EUNL.',
+      color: '#ef4444',
+      strokeDasharray: '5 5',
+      variant: 'line'
+    },
+    {
+      label: 'Multiplier',
+      description: 'Trend divided by price. Used to convert the current value of the stocks to the trend in the other charts.',
+      variant: 'note'
+    }
+  ]), []);
   // Show empty state if no EUNL data
   if (!data || data.length === 0) {
     return (
@@ -84,9 +111,10 @@ export function EUNLChart({
         // This helps when you're at the beginning of a month and haven't invested yet
         maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0); // One month beyond the last recorded month
         
-        // If viewMode is 'next2years', extend the range by 2 years
-        if (viewMode === 'next2years') {
-          maxMonth = new Date(maxDate.getFullYear() + 2, maxDate.getMonth() + 2, 0);
+        // If viewMode is 'next2years' or 'next5years', extend the range
+        if (viewMode === 'next2years' || viewMode === 'next5years') {
+          const yearsToAdd = viewMode === 'next5years' ? 5 : 2;
+          maxMonth = new Date(maxDate.getFullYear() + yearsToAdd, maxDate.getMonth() + 2, 0);
         }
         
         // Filter EUNL data to the same month range
@@ -261,6 +289,7 @@ export function EUNLChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
+      <ChartLegend items={legendItems} />
       
       {/* Trend Statistics Display */}
       {trendStats && (

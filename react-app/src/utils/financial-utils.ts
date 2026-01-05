@@ -130,6 +130,7 @@ export function calculateTargetWithFixedContribution(
       ? currentAdjustedValue
       : currentStocksValue;
     const startValueForMinContribution = currentStocksValue;
+    const startValueAdjustedForMinContribution = currentAdjustedValue;
 
     // Use the minimum required contribution for this month as the projection contribution.
     const projectionMinRequiredContribution = minRequiredContribution;
@@ -138,7 +139,7 @@ export function calculateTargetWithFixedContribution(
     let targetWithMinimumContribution = null;
     if (index === latestDataPointIndex) {
       // Only show this line starting from the last stocks data point
-      targetWithMinimumContribution = startValueForMinContribution;
+      targetWithMinimumContribution = startValueAdjustedForMinContribution;
     } else if (index > latestDataPointIndex) {
       // Continue calculating for future months
       targetWithMinimumContribution = previousMinContributionLineValue * (1 + monthlyGrowthRate) + projectionMinRequiredContribution;
@@ -149,7 +150,6 @@ export function calculateTargetWithFixedContribution(
     let plannedMinRequiredContribution = null;
     if (index === 0) {
       const futureValueOfAdjusted = firstAdjustedValue * pow1p(monthlyGrowthRate, monthsRemaining);
-      //const remainingToGoal = investmentGoal - firstAdjustedValue;
       const remainingToGoal = investmentGoal - futureValueOfAdjusted;
       plannedMinRequiredContribution = requiredPayment(remainingToGoal, monthlyGrowthRate, monthsRemaining);
       previousPlannedMinRequiredContribution = plannedMinRequiredContribution;
@@ -250,7 +250,7 @@ export function calculateTargetWithFixedContribution(
     if (index >= latestDataPointIndex) {
       if (item.stocks_in_eur) {
         // When we have actual stocks data, reset all previous values to this value
-        previousMinContributionLineValue = startValueForMinContribution;
+        previousMinContributionLineValue = startValueAdjustedForMinContribution as number;
         previousMinusOnePercentValue = startValueForProjections;
         previousPlusOnePercentValue = startValueForProjections;
         if (trendAnnualGrowthRate !== undefined && trendAnnualGrowthRate !== null) {

@@ -1,4 +1,4 @@
-import type { Event, Condition, Config } from '../types';
+import type { Event, Condition, Config, ViewMode } from '../types';
 import { APP_CONFIG } from '../config/app-config';
 import { parseNumeric } from './number-utils';
 
@@ -178,22 +178,23 @@ export function getRecentEvents(data: Event[], limit: number = APP_CONFIG.UI.MAX
  */
 export function filterDataByViewMode(
   data: Event[], 
-  viewMode: 'recorded' | 'next2years' | 'full'
+  viewMode: ViewMode
 ): Event[] {
   if (viewMode === 'recorded') {
     // Show only months with stock data
     return data.filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
-  } else if (viewMode === 'next2years') {
-    // Show recorded data + next 2 years (limit to exactly 2 years after last stock data)
+  } else if (viewMode === 'next2years' || viewMode === 'next5years') {
+    // Show recorded data + next years (limit to exactly N years after last stock data)
     const stocksData = data.filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
     if (stocksData.length > 0) {
       const lastStockDate = new Date(stocksData[stocksData.length - 1].date);
-      const twoYearsLater = new Date(lastStockDate);
-      twoYearsLater.setFullYear(twoYearsLater.getFullYear() + 2);
-      // Only show data up to 2 years after the last stock data point
+      const yearsToAdd = viewMode === 'next5years' ? 5 : 2;
+      const futureDate = new Date(lastStockDate);
+      futureDate.setFullYear(futureDate.getFullYear() + yearsToAdd);
+      // Only show data up to the target date after the last stock data point
       return data.filter(item => {
         const itemDate = new Date(item.date);
-        return itemDate <= twoYearsLater;
+        return itemDate <= futureDate;
       });
     } else {
       return data;

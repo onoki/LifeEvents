@@ -14,6 +14,7 @@ export function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeTogglePro
   const modes: Array<{ key: ViewMode; label: string }> = [
     { key: 'recorded', label: 'Show only recorded range' },
     { key: 'next2years', label: 'Show next 2 years' },
+    { key: 'next5years', label: 'Show next 5 years' },
     { key: 'full', label: 'Show full range' },
   ];
 

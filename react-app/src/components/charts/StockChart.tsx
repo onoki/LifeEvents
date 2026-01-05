@@ -6,6 +6,7 @@ import { parseNumeric } from '../../utils/number-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 import { StockValueIndicator } from './StockValueIndicator';
+import { ChartLegend } from './ChartLegend';
 
 /**
  * Stock Chart Component
@@ -96,6 +97,57 @@ export function StockChart({
   const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
     ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (EUNL trend)`
     : 'Growth scenario (EUNL trend)';
+  const plannedContributionAmount = config.planned_monthly_contribution;
+  const plannedContributionUntil = config.planned_monthly_contributions_until;
+  const plannedContributionDescription = isPrivacyMode
+    ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions.'
+    : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
+  const legendItems = React.useMemo(() => ([
+    {
+      label: 'Current value of owned stocks',
+      description: 'The actual value of owned stocks.',
+      color: '#3b82f6',
+      variant: 'area'
+    },
+    {
+      label: 'Current value adjusted for EUNL trend',
+      description: 'The stocks adjusted to the trend of MSCI World ETF (EUNL) instead of the daily price.',
+      color: '#8b5cf6',
+      strokeDasharray: '5 5',
+      variant: 'line'
+    },
+    {
+      label: 'Target with fixed contributions',
+      description: 'Base line target assuming fixed contributions from the first month to the last and a set annual growth. The current value of stocks should always be higher than this.',
+      color: '#ef4444',
+      variant: 'line'
+    },
+    {
+      label: 'Target with minimum contributions',
+      description: 'The expected trajectory of stocks value assuming the annual growth and the minimum contributions from this point forward required to reach the investment goal.',
+      color: '#10b981',
+      variant: 'line'
+    },
+    {
+      label: 'n % growth scenario',
+      description: 'Various possibilities if the annual growth is slightly higher or lower than the set growth.',
+      color: '#06b6d4',
+      variant: 'line'
+    },
+    {
+      label: 'Growth scenario (EUNL trend)',
+      description: 'Scenario based on the historical trend growth of EUNL.',
+      color: '#06b6d4',
+      strokeDasharray: '5 5',
+      variant: 'line'
+    },
+    {
+      label: 'Planned contributions path',
+      description: plannedContributionDescription,
+      color: '#f59e0b',
+      variant: 'line'
+    }
+  ]), [plannedContributionDescription]);
   const TooltipCursor = (props: {
     points?: Array<{ x: number; y: number }>;
     x?: number;
@@ -279,6 +331,7 @@ export function StockChart({
             dataKey="lineWithTrendGrowth"
             stroke="#06b6d4" 
             strokeWidth={1}
+            strokeDasharray="5 5"
             dot={false}
             activeDot={{ r: 3, fill: '#06b6d4' }}
             hide={data.every(item => item.lineWithTrendGrowth == null)}
@@ -373,6 +426,7 @@ export function StockChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
+      <ChartLegend items={legendItems} />
       
       {/* Stock Value Indicator */}
       {rawData && (

@@ -4,13 +4,53 @@ import type { MinRequiredContributionsChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
+import { ChartLegend } from './ChartLegend';
 
 /**
  * Minimum Required Contributions Chart Component
  * Displays the minimum required monthly contributions to reach investment goals
  */
-export function MinRequiredContributionsChart({ title, data }: MinRequiredContributionsChartProps): React.JSX.Element {
+export function MinRequiredContributionsChart({ title, data, config }: MinRequiredContributionsChartProps): React.JSX.Element {
   const { isPrivacyMode } = usePrivacyMode();
+  const plannedContributionAmount = config.planned_monthly_contribution;
+  const plannedContributionUntil = config.planned_monthly_contributions_until;
+  const plannedContributionDescription = isPrivacyMode
+    ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions.'
+    : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
+  const legendItems = React.useMemo(() => ([
+    {
+      label: 'Minimum required monthly contribution',
+      description: 'Minimum monthly contributions until the last month to reach the investment goal, assuming the set annual growth.',
+      color: '#3b82f6',
+      variant: 'area'
+    },
+    {
+      label: 'Target minimum required contribution',
+      description: 'Projected minimum monthly contributions after the last recorded month to reach the investment goal.',
+      color: '#10b981',
+      variant: 'line'
+    },
+    {
+      label: 'Monthly contribution adjusted for EUNL trend',
+      description: 'Minimum monthly contributions adjusted to the trend of MSCI World ETF (EUNL) instead of the daily price.',
+      color: '#8b5cf6',
+      strokeDasharray: '5 5',
+      variant: 'line'
+    },
+    {
+      label: 'Target contribution adjusted for EUNL trend',
+      description: 'Projected contributions adjusted to the EUNL trend after the last recorded month.',
+      color: '#10b981',
+      strokeDasharray: '5 5',
+      variant: 'line'
+    },
+    {
+      label: 'Target',
+      description: plannedContributionDescription,
+      color: '#f59e0b',
+      variant: 'line'
+    }
+  ]), [plannedContributionDescription]);
   // Add target line data to the main dataset
   const chartData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -188,6 +228,7 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
           />
         </AreaChart>
       </ResponsiveContainer>
+      <ChartLegend items={legendItems} />
     </div>
   );
 }

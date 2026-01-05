@@ -98,7 +98,7 @@ export interface EUNLChartProps {
   loading: boolean;
   showOnlyDataWithStocks: boolean;
   stocksData: Event[];
-  viewMode: 'recorded' | 'next2years' | 'full';
+  viewMode: ViewMode;
   trendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
   eunlError?: string | null;
 }
@@ -155,7 +155,7 @@ export interface YahooFinanceResponse {
 }
 
 // Utility types
-export type ViewMode = 'recorded' | 'next2years' | 'full';
+export type ViewMode = 'recorded' | 'next2years' | 'next5years' | 'full';
 
 export interface MonthlyEventData {
   month: string;
