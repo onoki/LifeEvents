@@ -12,6 +12,7 @@ export interface LegendItem {
 interface ChartLegendProps {
   items: LegendItem[];
   defaultOpen?: boolean;
+  controls?: React.ReactNode;
 }
 
 function LegendSwatch({
@@ -58,7 +59,7 @@ function LegendSwatch({
   );
 }
 
-export function ChartLegend({ items, defaultOpen = false }: ChartLegendProps): React.JSX.Element {
+export function ChartLegend({ items, defaultOpen = false, controls }: ChartLegendProps): React.JSX.Element {
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
   const visibleItems = items.filter((item) => !item.hidden);
 
@@ -68,6 +69,7 @@ export function ChartLegend({ items, defaultOpen = false }: ChartLegendProps): R
 
   return (
     <div className="mt-3">
+      <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -82,6 +84,8 @@ export function ChartLegend({ items, defaultOpen = false }: ChartLegendProps): R
         </span>
         {isOpen ? 'Hide legend' : 'Show legend'}
       </button>
+      {controls}
+    </div>
       {isOpen && (
         <div className="mt-2 rounded-md border border-gray-600 bg-card/50 p-3 text-sm">
           <ul className="space-y-2">

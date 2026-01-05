@@ -23,6 +23,7 @@ export function StockChart({
   rawData
 }: StockChartProps): React.JSX.Element {
   const { isPrivacyMode } = usePrivacyMode();
+  const [isSimplified, setIsSimplified] = React.useState(false);
   const progressAxis = React.useMemo(() => {
     const sourceData = progressAxisData && progressAxisData.length > 0 ? progressAxisData : data;
     if (!sourceData || sourceData.length === 0) {
@@ -132,14 +133,16 @@ export function StockChart({
       label: 'n % growth scenario',
       description: 'Various possibilities if the annual growth is slightly higher or lower than the set growth.',
       color: '#06b6d4',
-      variant: 'line'
+      variant: 'line',
+      hidden: isSimplified
     },
     {
       label: 'Growth scenario (EUNL trend)',
       description: 'Scenario based on the historical trend growth of EUNL.',
       color: '#06b6d4',
       strokeDasharray: '5 5',
-      variant: 'line'
+      variant: 'line',
+      hidden: isSimplified
     },
     {
       label: 'Planned contributions path',
@@ -147,7 +150,24 @@ export function StockChart({
       color: '#f59e0b',
       variant: 'line'
     }
-  ]), [plannedContributionDescription]);
+  ]), [isSimplified, plannedContributionDescription]);
+  const simplifyLinesButton = (
+    <button
+      type="button"
+      onClick={() => setIsSimplified((prev) => !prev)}
+      className={`inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs font-semibold text-foreground shadow-sm transition-colors hover:border-gray-500 hover:bg-gray-700/40 ${isSimplified ? 'border-gray-500 bg-gray-700/50' : 'border-gray-600 bg-card'}`}
+      aria-pressed={isSimplified}
+      title="Simplify lines"
+    >
+      <span
+        aria-hidden="true"
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-gray-500 text-[10px]"
+      >
+        {isSimplified ? '-' : '+'}
+      </span>
+      Simplify lines
+    </button>
+  );
   const TooltipCursor = (props: {
     points?: Array<{ x: number; y: number }>;
     x?: number;
@@ -306,6 +326,7 @@ export function StockChart({
             strokeWidth={1}
             dot={false}
             activeDot={{ r: 3, fill: '#06b6d4' }}
+            hide={isSimplified}
           />
           {/* 2. Target with minimum contributions */}
           <Line 
@@ -334,7 +355,7 @@ export function StockChart({
             strokeDasharray="5 5"
             dot={false}
             activeDot={{ r: 3, fill: '#06b6d4' }}
-            hide={data.every(item => item.lineWithTrendGrowth == null)}
+            hide={isSimplified || data.every(item => item.lineWithTrendGrowth == null)}
           />
           {milestoneMarkers.map((marker) => {
             const color = marker.achieved ? '#10b981' : '#f59e0b';
@@ -367,6 +388,7 @@ export function StockChart({
             strokeWidth={1}
             dot={false}
             activeDot={{ r: 3, fill: '#06b6d4' }}
+            hide={isSimplified}
           />
           {/* 4. Current value of owned stocks */}
           <Area 
@@ -426,7 +448,7 @@ export function StockChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
-      <ChartLegend items={legendItems} />
+      <ChartLegend items={legendItems} controls={simplifyLinesButton} />
       
       {/* Stock Value Indicator */}
       {rawData && (
