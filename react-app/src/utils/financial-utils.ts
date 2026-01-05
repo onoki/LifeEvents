@@ -16,6 +16,10 @@ export function calculateTargetWithFixedContribution(
   const investmentGoal = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
   const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
   const monthlyGrowthRate = annualGrowthRate / 12;
+  const plannedMonthlyContribution = parseNumeric(config.planned_monthly_contribution || '0');
+  const plannedUntilRaw = config.planned_monthly_contributions_until;
+  const plannedUntilDate = plannedUntilRaw ? new Date(plannedUntilRaw) : null;
+  const hasValidPlannedUntil = plannedUntilDate !== null && !Number.isNaN(plannedUntilDate.getTime());
 
   // Small helpers to avoid duplication and keep logic centralized
   const pow1p = (rate: number, n: number) => Math.pow(1 + rate, n);
@@ -42,6 +46,9 @@ export function calculateTargetWithFixedContribution(
   if (!firstStocksData) return [];
   
   const firstValue = parseNumeric(firstStocksData.stocks_in_eur!);
+  const firstAdjustedValue = firstStocksData.eunl_rate_to_trend
+    ? firstValue * parseNumeric(firstStocksData.eunl_rate_to_trend)
+    : firstValue;
 
   // Calculate total number of months from first to last date
   const totalMonths = (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + 
@@ -64,7 +71,6 @@ export function calculateTargetWithFixedContribution(
   let latestMinRequiredContribution = 0;
   let latestMinRequiredContributionAdjusted = 0;
   let latestDataPointIndex = -1;
-  let projectionMinRequiredContribution = 0;
   if (latestDataPoint) {
     latestDataPointIndex = sortedData.findIndex(item => 
       item.date.getTime() === latestDataPoint.date.getTime()
@@ -76,21 +82,24 @@ export function calculateTargetWithFixedContribution(
   let previousMinusOnePercentValue = 0;
   let previousPlusOnePercentValue = 0;
   let previousTrendGrowthValue = 0;
+  let previousPlannedContributionLineValue = firstAdjustedValue;
+  let previousPlannedProjectionValue = firstAdjustedValue;
+  let previousPlannedMinRequiredContribution = 0;
 
   const result = sortedData.map((item, index) => {
     const monthsFromStart = (item.date.getFullYear() - firstDate.getFullYear()) * 12 + 
                            (item.date.getMonth() - firstDate.getMonth());
     
     // Calculate target value for this month
-    const targetValue = firstValue * pow1p(monthlyGrowthRate, monthsFromStart) + 
+    const targetValue = firstAdjustedValue * pow1p(monthlyGrowthRate, monthsFromStart) + 
                        monthlyContribution * annuityFactor(monthlyGrowthRate, monthsFromStart);
     
     // Calculate minimum required contribution for this month
     let minRequiredContribution = 0;
     let minRequiredContributionAdjusted = 0;
+    const monthsRemaining = Math.max(0, totalMonths - monthsFromStart - 1);
     if (index <= latestDataPointIndex) {
       // For points up to and including the latest known data point, calculate normally
-      const monthsRemaining = totalMonths - monthsFromStart - 1;
       const currentValue = item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : 0;
       const futureValueOfCurrent = currentValue * pow1p(monthlyGrowthRate, monthsRemaining);
       const remainingToGoal = investmentGoal - futureValueOfCurrent;
@@ -108,7 +117,7 @@ export function calculateTargetWithFixedContribution(
         }
       }
     } else {
-      // For future points (after latest known data point), use the same value as latest
+      // For future points, recompute using the projected minimum-contribution line value.
       minRequiredContribution = latestMinRequiredContribution;
       minRequiredContributionAdjusted = latestMinRequiredContributionAdjusted;
     }
@@ -120,27 +129,69 @@ export function calculateTargetWithFixedContribution(
     const startValueForProjections = !isNaN(currentAdjustedValue as number) && currentAdjustedValue !== null
       ? currentAdjustedValue
       : currentStocksValue;
+    const startValueForMinContribution = currentStocksValue;
 
-    // Decide whether projections should use adjusted contributions at the latest data point
-    if (index === latestDataPointIndex) {
-      if (currentAdjustedValue !== null && !isNaN(currentAdjustedValue)) {
-        projectionMinRequiredContribution = latestMinRequiredContributionAdjusted;
-      } else {
-        projectionMinRequiredContribution = latestMinRequiredContribution;
-      }
-    }
+    // Use the minimum required contribution for this month as the projection contribution.
+    const projectionMinRequiredContribution = minRequiredContribution;
 
     // Calculate minimum contribution line value
     let targetWithMinimumContribution = null;
     if (index === latestDataPointIndex) {
       // Only show this line starting from the last stocks data point
-      targetWithMinimumContribution = startValueForProjections;
+      targetWithMinimumContribution = startValueForMinContribution;
     } else if (index > latestDataPointIndex) {
       // Continue calculating for future months
       targetWithMinimumContribution = previousMinContributionLineValue * (1 + monthlyGrowthRate) + projectionMinRequiredContribution;
     }
     // For months before the last stocks data point, keep as null
     
+    // Planned minimum required contribution line (target)
+    let plannedMinRequiredContribution = null;
+    if (index === 0) {
+      const futureValueOfAdjusted = firstAdjustedValue * pow1p(monthlyGrowthRate, monthsRemaining);
+      //const remainingToGoal = investmentGoal - firstAdjustedValue;
+      const remainingToGoal = investmentGoal - futureValueOfAdjusted;
+      plannedMinRequiredContribution = requiredPayment(remainingToGoal, monthlyGrowthRate, monthsRemaining);
+      previousPlannedMinRequiredContribution = plannedMinRequiredContribution;
+      previousPlannedProjectionValue = firstAdjustedValue;
+    } else {
+      const contributesThisMonth = plannedMonthlyContribution > 0
+        && (!hasValidPlannedUntil || item.date <= plannedUntilDate!);
+      const projectedValue = previousPlannedProjectionValue * (1 + monthlyGrowthRate)
+        + (contributesThisMonth ? plannedMonthlyContribution : 0);
+      let futureValueOfProjected = 0;
+      if (hasValidPlannedUntil && item.date > plannedUntilDate!) {
+        plannedMinRequiredContribution = previousPlannedMinRequiredContribution;
+      } else {
+        futureValueOfProjected = projectedValue * pow1p(monthlyGrowthRate, monthsRemaining);
+        const remainingToGoal = investmentGoal - futureValueOfProjected;
+        plannedMinRequiredContribution = requiredPayment(remainingToGoal, monthlyGrowthRate, monthsRemaining);
+        previousPlannedMinRequiredContribution = plannedMinRequiredContribution;
+      }
+      previousPlannedProjectionValue = projectedValue;
+    }
+
+    // Planned contribution growth line (start from the first month)
+    let plannedContributionLine = null;
+    if (index === 0) {
+      plannedContributionLine = previousPlannedContributionLineValue;
+    } else {
+      const usePlannedContribution = plannedMonthlyContribution > 0
+        && (!hasValidPlannedUntil || item.date <= plannedUntilDate!);
+      const baseValue = previousPlannedContributionLineValue * (1 + monthlyGrowthRate);
+      const monthlyContribution = usePlannedContribution
+        ? plannedMonthlyContribution
+        : requiredPayment(
+            investmentGoal - baseValue * pow1p(monthlyGrowthRate, monthsRemaining),
+            monthlyGrowthRate,
+            monthsRemaining
+          );
+      plannedContributionLine = baseValue + monthlyContribution;
+    }
+    if (plannedContributionLine !== null) {
+      previousPlannedContributionLineValue = plannedContributionLine;
+    }
+
     // Calculate alternative growth scenarios (annual_growth_rate ± 1%)
     const monthlyGrowthRateMinusOne = (annualGrowthRate - 0.01) / 12;
     const monthlyGrowthRatePlusOne = (annualGrowthRate + 0.01) / 12;
@@ -185,6 +236,8 @@ export function calculateTargetWithFixedContribution(
       lineWithPlusOnePercentGrowth: lineWithPlusOnePercentGrowth ? Math.max(0, lineWithPlusOnePercentGrowth) : null,
       lineWithTrendGrowth: lineWithTrendGrowth ? Math.max(0, lineWithTrendGrowth) : null,
       targetWithMinimumContribution: targetWithMinimumContribution ? Math.max(0, targetWithMinimumContribution) : null,
+      plannedContributionLine: plannedContributionLine !== null ? Math.max(0, plannedContributionLine) : null,
+      plannedMinRequiredContribution: plannedMinRequiredContribution !== null ? Math.max(0, plannedMinRequiredContribution) : null,
       lineWithMinusOnePercentGrowth: lineWithMinusOnePercentGrowth ? Math.max(0, lineWithMinusOnePercentGrowth) : null,
       stocks_in_eur: item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : null,
       stocks_in_eur_adjusted_for_eunl_trend: stocksInEurAdjusted,
@@ -197,7 +250,7 @@ export function calculateTargetWithFixedContribution(
     if (index >= latestDataPointIndex) {
       if (item.stocks_in_eur) {
         // When we have actual stocks data, reset all previous values to this value
-        previousMinContributionLineValue = startValueForProjections;
+        previousMinContributionLineValue = startValueForMinContribution;
         previousMinusOnePercentValue = startValueForProjections;
         previousPlusOnePercentValue = startValueForProjections;
         if (trendAnnualGrowthRate !== undefined && trendAnnualGrowthRate !== null) {
@@ -217,6 +270,7 @@ export function calculateTargetWithFixedContribution(
         if (lineWithTrendGrowth !== null) {
           previousTrendGrowthValue = lineWithTrendGrowth;
         }
+        
       }
     }
     

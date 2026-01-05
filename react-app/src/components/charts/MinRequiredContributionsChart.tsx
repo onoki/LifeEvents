@@ -15,10 +15,6 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
   const chartData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
     
-    const firstValue = data[0]?.minRequiredContribution || 0;
-    const targetValue = 250;
-    const targetDate = new Date('2030-08-01');
-    
     // Find the last date where we have actual stock data
     let lastStockDataIndex = -1;
     for (let i = data.length - 1; i >= 0; i--) {
@@ -31,27 +27,16 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
     const lastStockDataDate = lastStockDataIndex >= 0 ? data[lastStockDataIndex]?.date : data[0]?.date;
     
     // Create target line points only for the existing data range
-    const enhancedData = data.map((item, index) => {
+    const enhancedData = data.map((item) => {
       let targetLineValue = null;
       let minRequiredContributionArea = null;
       let minRequiredContributionLine = null;
       let minRequiredContributionAdjustedArea = null;
       let minRequiredContributionAdjustedLine = null;
       
-      // Calculate target line value based on linear interpolation
-      if (index === 0) {
-        // First point: start value
-        targetLineValue = firstValue;
-      } else if (item.date <= targetDate) {
-        // Calculate linear interpolation from first value to target value
-        const totalDays = targetDate.getTime() - data[0].date.getTime();
-        const currentDays = item.date.getTime() - data[0].date.getTime();
-        const progress = Math.min(currentDays / totalDays, 1); // Cap at 1
-        targetLineValue = firstValue + (targetValue - firstValue) * progress;
-      } else {
-        // After target date: horizontal line at target value
-        targetLineValue = targetValue;
-      }
+      targetLineValue = typeof item.plannedMinRequiredContribution === 'number'
+        ? item.plannedMinRequiredContribution
+        : null;
       
       // Split minRequiredContribution into area (with data) and line (projection)
       // Include transition point in line to avoid gap
@@ -82,7 +67,7 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
         minRequiredContributionAdjustedLine = item.minRequiredContributionAdjustedForEUNLTrend;
       }
       
-      return {
+      const result = {
         ...item,
         targetLine: targetLineValue,
         minRequiredContributionArea,
@@ -90,6 +75,7 @@ export function MinRequiredContributionsChart({ title, data }: MinRequiredContri
         minRequiredContributionAdjustedArea,
         minRequiredContributionAdjustedLine
       };
+      return result;
     });
     
     return enhancedData;

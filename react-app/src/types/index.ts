@@ -23,6 +23,7 @@ export interface Config {
   investment_goal?: string;
   annual_growth_rate?: string;
   planned_monthly_contribution?: string;
+  planned_monthly_contributions_until?: string;
 }
 
 export interface ChartDataPoint {
@@ -35,6 +36,8 @@ export interface ChartDataPoint {
   lineWithMinusOnePercentGrowth?: number | null;
   lineWithPlusOnePercentGrowth?: number | null;
   lineWithTrendGrowth?: number | null;
+  plannedContributionLine?: number | null;
+  plannedMinRequiredContribution?: number | null;
   minRequiredContribution?: number;
   minRequiredContributionAdjustedForEUNLTrend?: number;
 }

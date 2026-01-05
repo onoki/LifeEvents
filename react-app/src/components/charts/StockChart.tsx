@@ -65,6 +65,7 @@ export function StockChart({
       'lineWithMinusOnePercentGrowth',
       'stocks_in_eur',
       'stocks_in_eur_adjusted_for_eunl_trend',
+      'plannedContributionLine',
       'targetWithFixedContribution'
     ];
     let min = Number.POSITIVE_INFINITY;
@@ -227,6 +228,7 @@ export function StockChart({
                 const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
                 const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
                              name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value adjusted for EUNL trend' :
+                             name === 'plannedContributionLine' ? 'Planned contributions path' :
                              name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
                              name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
                              name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
@@ -261,6 +263,15 @@ export function StockChart({
             strokeWidth={1}
             dot={false}
             activeDot={{ r: 3, fill: '#10b981' }}
+          />
+          {/* 2a. Planned contributions path */}
+          <Line
+            type="monotone"
+            dataKey="plannedContributionLine"
+            stroke="#f59e0b"
+            strokeWidth={1}
+            dot={false}
+            activeDot={{ r: 3, fill: '#f59e0b' }}
           />
           {/* 2b. Calculated trend growth scenario */}
           <Line 
