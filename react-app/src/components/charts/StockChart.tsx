@@ -1,6 +1,6 @@
 import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, ReferenceDot, ReferenceLine, Label } from 'recharts';
-import type { StockChartProps, MilestoneMarker, ChartDataPoint } from '../../types';
+import type { StockChartProps, ChartDataPoint } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
@@ -18,12 +18,48 @@ export function StockChart({
   progressAxisData,
   dataKey,
   config,
-  conditions,
+  milestoneMarkers = [],
   trendAnnualGrowthRate,
   rawData
 }: StockChartProps): React.JSX.Element {
   const { isPrivacyMode } = usePrivacyMode();
   const [isSimplified, setIsSimplified] = React.useState(false);
+  const rightAxisDomain = React.useMemo(() => {
+    const keys: Array<keyof ChartDataPoint> = [
+      'lineWithPlusOnePercentGrowth',
+      'targetWithMinimumContribution',
+      'lineWithTrendGrowth',
+      'lineWithMinusOnePercentGrowth',
+      'stocks_in_eur',
+      'stocks_in_eur_adjusted_for_eunl_trend',
+      'plannedContributionLine',
+      'targetWithFixedContribution'
+    ];
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    const perKeyMax: Partial<Record<keyof ChartDataPoint, number>> = {};
+    data.forEach((item) => {
+      keys.forEach((key) => {
+        const value = item[key];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          min = Math.min(min, value);
+          max = Math.max(max, value);
+          if (perKeyMax[key] === undefined || value > perKeyMax[key]!) {
+            perKeyMax[key] = value;
+          }
+        }
+      });
+    });
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return [0, 0] as [number, number];
+    }
+    const roundedMin = Math.floor(min / 1000) * 1000;
+    const roundedMax = Math.ceil(max / 1000) * 1000;
+    return [roundedMin, roundedMax] as [number, number];
+  }, [data]);
+  const isWithinRightAxisDomain = React.useCallback((value: number) => {
+    return value >= rightAxisDomain[0] && value <= rightAxisDomain[1];
+  }, [rightAxisDomain]);
   const progressAxis = React.useMemo(() => {
     const sourceData = progressAxisData && progressAxisData.length > 0 ? progressAxisData : data;
     if (!sourceData || sourceData.length === 0) {
@@ -45,49 +81,23 @@ export function StockChart({
       return { ticks: [] as number[], entries: [] as Array<{ value: number; label: string }>, labelByValue: new Map<number, string>(), domain: [0, 0] as [number, number] };
     }
 
-    const ticks = entries.map((entry) => entry.value);
+    const [domainMin, domainMax] = rightAxisDomain;
+    const visibleEntries = entries.filter((entry) => entry.value >= domainMin && entry.value <= domainMax);
+    const usedEntries = visibleEntries.length > 0 ? visibleEntries : entries;
+    const ticks = usedEntries.map((entry) => entry.value);
     const min = Math.min(...ticks);
     const max = Math.max(...ticks);
     const labelByValue = new Map<number, string>();
-    entries.forEach((entry) => {
+    usedEntries.forEach((entry) => {
       labelByValue.set(entry.value, entry.label);
     });
     return {
       ticks,
-      entries,
+      entries: usedEntries,
       labelByValue,
       domain: [min, max] as [number, number]
     };
-  }, [data, progressAxisData]);
-  const rightAxisDomain = React.useMemo(() => {
-    const keys: Array<keyof ChartDataPoint> = [
-      'lineWithPlusOnePercentGrowth',
-      'targetWithMinimumContribution',
-      'lineWithTrendGrowth',
-      'lineWithMinusOnePercentGrowth',
-      'stocks_in_eur',
-      'stocks_in_eur_adjusted_for_eunl_trend',
-      'plannedContributionLine',
-      'targetWithFixedContribution'
-    ];
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    data.forEach((item) => {
-      keys.forEach((key) => {
-        const value = item[key];
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          min = Math.min(min, value);
-          max = Math.max(max, value);
-        }
-      });
-    });
-    if (!Number.isFinite(min) || !Number.isFinite(max)) {
-      return [0, 0] as [number, number];
-    }
-    const roundedMin = Math.floor(min / 1000) * 1000;
-    const roundedMax = Math.ceil(max / 1000) * 1000;
-    return [roundedMin, roundedMax] as [number, number];
-  }, [data]);
+  }, [data, progressAxisData, rightAxisDomain]);
   const investmentGoal = React.useMemo(() => {
     const parsed = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
     return Number.isFinite(parsed) ? parsed : null;
@@ -198,47 +208,6 @@ export function StockChart({
     };
   }, [data]);
   
-  // Calculate milestone markers for conditions
-  const milestoneMarkers: MilestoneMarker[] = [];
-  if (conditions && conditions.length > 0) {
-    conditions.forEach((condition) => {
-      const conditionValue = parseNumeric(condition.condition || '0');
-      if (!isNaN(conditionValue)) {
-        const achievedPoint = data.find(item => 
-          typeof item.stocks_in_eur_adjusted_for_eunl_trend === 'number' &&
-          item.stocks_in_eur_adjusted_for_eunl_trend >= conditionValue
-        );
-
-        if (achievedPoint) {
-          milestoneMarkers.push({
-            x: achievedPoint.dateFormatted,
-            y: conditionValue,
-            label: condition.explanation_short || 'Unknown',
-            condition: conditionValue,
-            achieved: true
-          });
-          return;
-        }
-
-        const targetPoint = data.find(item => 
-          typeof item.targetWithMinimumContribution === 'number' &&
-          item.targetWithMinimumContribution >= conditionValue
-        );
-
-        if (targetPoint) {
-          milestoneMarkers.push({
-            x: targetPoint.dateFormatted,
-            y: conditionValue,
-            label: condition.explanation_short || 'Unknown',
-            condition: conditionValue,
-            achieved: false
-          });
-        }
-      }
-    });
-  }
-
-  
   return (
     <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
       <div className="mb-4">
@@ -312,8 +281,8 @@ export function StockChart({
               cursor={<TooltipCursor />}
             />
           )}
-          {latestAdjustedPoint !== null && (
-            <ReferenceLine y={latestAdjustedPoint.y} stroke="#6b7280" strokeDasharray="4 4" ifOverflow="extendDomain" />
+          {latestAdjustedPoint !== null && isWithinRightAxisDomain(latestAdjustedPoint.y) && (
+            <ReferenceLine y={latestAdjustedPoint.y} stroke="#6b7280" strokeDasharray="4 4" />
           )}
           {shouldShowInvestmentGoalLine && investmentGoal !== null && (
             <ReferenceLine y={investmentGoal} stroke="#6b7280" strokeDasharray="4 4" />
@@ -357,7 +326,9 @@ export function StockChart({
             activeDot={{ r: 3, fill: '#06b6d4' }}
             hide={isSimplified || data.every(item => item.lineWithTrendGrowth == null)}
           />
-          {milestoneMarkers.map((marker) => {
+          {milestoneMarkers
+            .filter((marker) => isWithinRightAxisDomain(marker.y))
+            .map((marker) => {
             const color = marker.achieved ? '#10b981' : '#f59e0b';
             return (
               <ReferenceDot
@@ -368,7 +339,6 @@ export function StockChart({
                 fill={color}
                 stroke="#ffffff"
                 strokeWidth={2}
-                ifOverflow="extendDomain"
               >
                 <Label
                   value={isPrivacyMode ? 'Reward' : marker.label}
@@ -412,7 +382,7 @@ export function StockChart({
             connectNulls={true}
             activeDot={{ r: 3, fill: '#8b5cf6' }}
           />
-          {latestAdjustedPoint !== null && (
+          {latestAdjustedPoint !== null && isWithinRightAxisDomain(latestAdjustedPoint.y) && (
             <ReferenceDot
               x={latestAdjustedPoint.x}
               y={latestAdjustedPoint.y}
@@ -420,7 +390,6 @@ export function StockChart({
               fill="none"
               stroke="#ffffff"
               strokeWidth={1.25}
-              ifOverflow="extendDomain"
               className="pulse-ring"
             />
           )}

@@ -53,6 +53,9 @@ export function StockCharts({
     }
   };
 
+  const filteredTimestamps = new Set(filteredData.map((item) => item.date.getTime()));
+  const filteredChartData = fullChartData.filter((item) => filteredTimestamps.has(item.date.getTime()));
+
   return (
     <div className="space-y-6">
       {/* View Mode Toggle Control */}
@@ -62,11 +65,11 @@ export function StockCharts({
       <div className="mb-8">
         <StockChart 
           title="Owned stocks" 
-          data={fullChartData.filter(item => filteredData.some(filteredItem => filteredItem.date.getTime() === item.date.getTime()))}
+          data={filteredChartData}
           progressAxisData={fullChartData}
           dataKey="stocks_in_eur"
           config={config}
-          conditions={conditions}
+          milestoneMarkers={milestoneMarkers}
           trendAnnualGrowthRate={eunlTrendStats?.annualGrowthRate ?? null}
           rawData={data}
         />
@@ -79,7 +82,7 @@ export function StockCharts({
         {/* Minimum Required Contributions Chart */}
         <MinRequiredContributionsChart 
           title="Minimum required monthly contributions to reach the goal" 
-          data={fullChartData.filter(item => filteredData.some(filteredItem => filteredItem.date.getTime() === item.date.getTime()))}
+          data={filteredChartData}
           config={config}
         />
         

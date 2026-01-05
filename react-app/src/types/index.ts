@@ -86,7 +86,7 @@ export interface StockChartProps {
   progressAxisData?: ChartDataPoint[];
   dataKey: string;
   config: Config;
-  conditions: Condition[];
+  milestoneMarkers?: MilestoneMarker[];
   trendAnnualGrowthRate?: number | null;
   rawData?: Event[];
 }

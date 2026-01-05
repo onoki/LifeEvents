@@ -23,12 +23,13 @@ function applyWorkdayTransition(date: Date): Date {
 export function countWorkdays(startDate: Date, endDate: Date): number {
   let count = 0;
   const current = applyWorkdayTransition(startDate);
+  const end = new Date(endDate);
   
   // only care about the date after this point, not time
   current.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
 
-  while (current <= endDate) {
+  while (current <= end) {
     const dayOfWeek = current.getDay();
     // Monday = 1, Tuesday = 2, ..., Friday = 5
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
@@ -47,12 +48,13 @@ export function countWorkdays(startDate: Date, endDate: Date): number {
 export function countWorkdaysWithVacation(startDate: Date, endDate: Date): number {
   let count = 0;
   const current = applyWorkdayTransition(startDate);
+  const end = new Date(endDate);
   
   // only care about the date after this point, not time
   current.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
 
-  while (current < endDate) {
+  while (current < end) {
     const dayOfWeek = current.getDay();
     const month = current.getMonth();
     

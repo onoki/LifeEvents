@@ -3,6 +3,7 @@ import {
   formatPercentage,
   processStocksData,
   calculateTargetWithFixedContribution,
+  calculateExponentialTrend,
 } from '../financial-utils';
 import type { Event } from '../../types';
 
@@ -213,6 +214,88 @@ describe('financial-utils', () => {
       expect(result[0].targetWithMinimumContribution).toBeCloseTo(200, 6);
       expect(result[1].targetWithMinimumContribution).toBeCloseTo(230, 6);
       expect(result[2].targetWithMinimumContribution).toBeCloseTo(260, 6);
+    });
+
+    it('projects growth scenario lines from the latest stock point', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-01') },
+        { date: new Date('2024-02-01'), stocks_in_eur: '100' },
+        { date: new Date('2024-03-01') },
+      ];
+      const config = {
+        investment_goal: '120',
+        annual_growth_rate: '0.12',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config, 0.12);
+
+      expect(result[0].lineWithPlusOnePercentGrowth).toBeNull();
+      expect(result[0].lineWithMinusOnePercentGrowth).toBeNull();
+      expect(result[0].lineWithTrendGrowth).toBeNull();
+
+      expect(result[1].lineWithPlusOnePercentGrowth).toBeCloseTo(100, 6);
+      expect(result[1].lineWithMinusOnePercentGrowth).toBeCloseTo(100, 6);
+      expect(result[1].lineWithTrendGrowth).toBeCloseTo(100, 6);
+
+      const annualGrowthRate = 0.12;
+      const monthlyGrowthRate = annualGrowthRate / 12;
+      const monthsRemaining = 1;
+      const currentValue = 100;
+      const futureValueOfCurrent = currentValue * Math.pow(1 + monthlyGrowthRate, monthsRemaining);
+      const remainingToGoal = 120 - futureValueOfCurrent;
+      const annuityFactor = (Math.pow(1 + monthlyGrowthRate, monthsRemaining) - 1) / monthlyGrowthRate;
+      const expectedMinRequired = remainingToGoal / annuityFactor;
+      const plusMonthly = (0.12 + 0.01) / 12;
+      const minusMonthly = (0.12 - 0.01) / 12;
+      const trendMonthly = 0.12 / 12;
+
+      expect(result[2].lineWithPlusOnePercentGrowth).toBeCloseTo(100 * (1 + plusMonthly) + expectedMinRequired, 6);
+      expect(result[2].lineWithMinusOnePercentGrowth).toBeCloseTo(100 * (1 + minusMonthly) + expectedMinRequired, 6);
+      expect(result[2].lineWithTrendGrowth).toBeCloseTo(100 * (1 + trendMonthly) + expectedMinRequired, 6);
+    });
+
+    it('projects planned contribution line with fixed monthly contributions (zero growth)', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-01'), stocks_in_eur: '100' },
+        { date: new Date('2024-02-01') },
+        { date: new Date('2024-03-01') },
+      ];
+      const config = {
+        investment_goal: '1000',
+        annual_growth_rate: '0',
+        planned_monthly_contribution: '50',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      expect(result[0].plannedContributionLine).toBeCloseTo(100, 6);
+      expect(result[1].plannedContributionLine).toBeCloseTo(150, 6);
+      expect(result[2].plannedContributionLine).toBeCloseTo(200, 6);
+    });
+  });
+
+  describe('calculateExponentialTrend', () => {
+    it('returns trend stats and confidence bounds that match exponential data', () => {
+      const data = [
+        { date: new Date('2024-01-01'), price: 100 },
+        { date: new Date('2024-01-02'), price: 110 },
+        { date: new Date('2024-01-03'), price: 121 },
+      ];
+
+      const result = calculateExponentialTrend(data);
+
+      expect(result.data).toHaveLength(3);
+      expect(result.trendStats).not.toBeNull();
+
+      const firstPoint = result.data[0];
+      const lastPoint = result.data[2];
+
+      expect(firstPoint.trend).toBeCloseTo(firstPoint.price, 6);
+      expect(lastPoint.trend).toBeCloseTo(lastPoint.price, 6);
+      expect(firstPoint.multiplier).toBeCloseTo(1, 6);
+      expect(lastPoint.multiplier).toBeCloseTo(1, 6);
+      expect(firstPoint.trendUpperBound).toBeGreaterThanOrEqual(firstPoint.trendLowerBound);
+      expect(lastPoint.trendUpperBound).toBeGreaterThanOrEqual(lastPoint.trendLowerBound);
     });
   });
 });

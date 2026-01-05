@@ -5,40 +5,39 @@ import { parseNumeric } from './number-utils';
 /**
  * Process and normalize event data
  */
-export function processEventData(event: any): Event {
-  // Convert date string to Date object
+export function processEventData(event: Record<string, string>): Event {
+  const normalized: Event = {
+    ...event,
+  } as unknown as Event;
+
   if (event.date) {
-    event.date = new Date(event.date);
+    normalized.date = new Date(event.date);
   }
 
-  // For stocks data, create some default values for the dashboard
   if (event.stocks_in_eur) {
-    event.event = `Stocks Value: ${event.stocks_in_eur}`;
-    event.category = 'Finance';
-    event.status = 'completed';
-    event.duration = '1 day';
-    event.durationDays = 1;
+    normalized.event = `Stocks Value: ${event.stocks_in_eur}`;
+    normalized.category = 'Finance';
+    normalized.status = 'completed';
+    normalized.duration = '1 day';
+    normalized.durationDays = 1;
   }
 
-  // Parse duration if it exists
   if (event.duration) {
     const durationMatch = event.duration.match(/(\d+)/);
-    event.durationDays = durationMatch ? parseInt(durationMatch[1]) : 0;
+    normalized.durationDays = durationMatch ? parseInt(durationMatch[1]) : 0;
   } else {
-    event.durationDays = 0;
+    normalized.durationDays = 0;
   }
 
-  // Normalize status
   if (event.status) {
-    event.status = event.status.toLowerCase();
+    normalized.status = event.status.toLowerCase();
   }
 
-  // Normalize category
   if (event.category) {
-    event.category = event.category.trim();
+    normalized.category = event.category.trim();
   }
 
-  return event;
+  return normalized;
 }
 
 /**
@@ -111,15 +110,14 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
   
   const parsedData = dataLines.slice(1).map((line) => {
     const values = line.split('\t').map(v => v.trim());
-    const event: any = {};
+    const event: Record<string, string> = {};
     
     headers.forEach((header, headerIndex) => {
       event[header] = values[headerIndex] || '';
     });
 
-    // Normalize and process the data
     return processEventData(event);
-  }).filter(event => event.date); // Filter out invalid entries
+  }).filter(event => event.date);
   
   return { config: configData, conditions: conditionsData, data: parsedData };
 }

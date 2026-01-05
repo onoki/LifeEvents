@@ -89,12 +89,13 @@ export function EUNLChart({
     );
   }
 
+  const isEunlData = data.length > 0 && data[0].price !== undefined;
   // Apply toggle filter if needed (only for display)
   let filteredData = data;
   
   if (showOnlyDataWithStocks && data.length > 0) {
     // If this is EUNL data (has 'price' field), filter by date range of stocks data
-    if (data[0].price !== undefined && stocksData && stocksData.length > 0) {
+    if (isEunlData && stocksData && stocksData.length > 0) {
       // Get the date range from stocks data that has actual values
       const stocksWithData = stocksData.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
       if (stocksWithData.length > 0) {
@@ -123,7 +124,7 @@ export function EUNLChart({
           return itemDate >= minMonth && itemDate <= maxMonth;
         });
       }
-    } else if ('stocks_in_eur' in data[0] && data[0].stocks_in_eur !== undefined) {
+    } else if (!isEunlData && 'stocks_in_eur' in data[0] && data[0].stocks_in_eur !== undefined) {
       // This is stocks data - filter normally
       filteredData = data.filter(item => 'stocks_in_eur' in item && item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
     }
@@ -247,7 +248,7 @@ export function EUNLChart({
           {/* Main price area */}
           <Area 
             type="monotone" 
-            dataKey={data.length > 0 && data[0].price !== undefined ? "price" : "stocks_in_eur"}
+            dataKey={isEunlData ? "price" : "stocks_in_eur"}
             stroke="#06b6d4" 
             fill="#06b6d4"
             fillOpacity={0.3}
