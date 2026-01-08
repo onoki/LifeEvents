@@ -1,4 +1,4 @@
-import type { Event, Condition, Config, ViewMode } from '../types';
+import type { Event, Condition, Config, ViewMode, ChartDataPoint, MilestoneMarker } from '../types';
 import { APP_CONFIG } from '../config/app-config';
 import { parseNumeric } from './number-utils';
 
@@ -207,32 +207,52 @@ export function filterDataByViewMode(
  * Calculate milestone markers for conditions
  */
 export function calculateMilestoneMarkers(
-  chartData: any[], 
+  chartData: ChartDataPoint[], 
   conditions: Condition[]
-): Array<{ x: string; y: number; label: string; condition: number }> {
-  const milestoneMarkers: Array<{ x: string; y: number; label: string; condition: number }> = [];
-  
-  if (conditions && conditions.length > 0) {
-    conditions.forEach((condition) => {
-      const conditionValue = parseNumeric(condition.condition || '0');
-      if (!isNaN(conditionValue)) {
-        // Find the first data point where targetWithMinimumContribution exceeds the condition
-        const milestonePoint = chartData.find(item => 
-          item.targetWithMinimumContribution && 
-          item.targetWithMinimumContribution >= conditionValue
-        );
-        
-        if (milestonePoint) {
-          milestoneMarkers.push({
-            x: milestonePoint.dateFormatted,
-            y: milestonePoint.targetWithMinimumContribution,
-            label: condition.explanation_short || 'Unknown',
-            condition: conditionValue
-          });
-        }
-      }
-    });
+): MilestoneMarker[] {
+  const milestoneMarkers: MilestoneMarker[] = [];
+
+  if (!conditions || conditions.length === 0 || !chartData || chartData.length === 0) {
+    return milestoneMarkers;
   }
-  
+
+  conditions.forEach((condition) => {
+    const conditionValue = parseNumeric(condition.condition || '0');
+    if (!Number.isFinite(conditionValue)) {
+      return;
+    }
+
+    const achievedPoint = chartData.find((item) => {
+      const adjustedValue = item.stocks_in_eur_adjusted_for_eunl_trend;
+      return typeof adjustedValue === 'number' && Number.isFinite(adjustedValue) && adjustedValue >= conditionValue;
+    });
+
+    if (achievedPoint) {
+      milestoneMarkers.push({
+        x: achievedPoint.dateFormatted,
+        y: achievedPoint.stocks_in_eur_adjusted_for_eunl_trend as number,
+        label: condition.explanation_short || 'Unknown',
+        condition: conditionValue,
+        achieved: true
+      });
+      return;
+    }
+
+    const projectedPoint = chartData.find((item) => {
+      const targetValue = item.targetWithMinimumContribution;
+      return typeof targetValue === 'number' && Number.isFinite(targetValue) && targetValue >= conditionValue;
+    });
+
+    if (projectedPoint) {
+      milestoneMarkers.push({
+        x: projectedPoint.dateFormatted,
+        y: projectedPoint.targetWithMinimumContribution as number,
+        label: condition.explanation_short || 'Unknown',
+        condition: conditionValue,
+        achieved: false
+      });
+    }
+  });
+
   return milestoneMarkers;
 }

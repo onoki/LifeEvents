@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { calculateTargetWithFixedContribution, processStocksData, calculateExponentialTrend } from '../utils/financial-utils';
 import { filterDataByViewMode, calculateMilestoneMarkers } from '../utils/data-processing-utils';
-import type { Event, Config, Condition, ChartDataPoint, EUNLDataPoint, ViewMode } from '../types';
+import type { Event, Config, Condition, ChartDataPoint, EUNLDataPoint, ViewMode, MilestoneMarker } from '../types';
 
 export interface FinancialCalculations {
   // Chart data
@@ -14,7 +14,7 @@ export interface FinancialCalculations {
   eunlChartData: EUNLDataPoint[];
   
   // Milestone markers
-  milestoneMarkers: Array<{ x: string; y: number; label: string; condition: number }>;
+  milestoneMarkers: MilestoneMarker[];
 }
 
 /**
