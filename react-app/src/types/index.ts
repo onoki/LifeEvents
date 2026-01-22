@@ -38,6 +38,7 @@ export interface ChartDataPoint {
   lineWithTrendGrowth?: number | null;
   plannedContributionLine?: number | null;
   plannedMinRequiredContribution?: number | null;
+  expectedMinRequiredContribution?: number | null;
   minRequiredContribution?: number;
   minRequiredContributionAdjustedForEUNLTrend?: number;
 }
@@ -76,6 +77,8 @@ export interface StockChartsProps {
   eunlData: EUNLDataPoint[];
   onFetchEUNL: () => Promise<void>;
   loading: boolean;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
   eunlTrendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
   eunlError?: string | null;
 }

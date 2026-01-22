@@ -1,5 +1,5 @@
 import React from 'react';
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceDot } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceDot, ReferenceLine } from 'recharts';
 import type { MinRequiredContributionsChartProps } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
@@ -18,6 +18,11 @@ export function MinRequiredContributionsChart({ title, data, config }: MinRequir
     ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions.'
     : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
   const legendItems = React.useMemo(() => ([
+    {
+      label: 'Percentage (left Y axis)',
+      description: 'Progress to reach 0 \u20AC savings target.',
+      variant: 'note'
+    },
     {
       label: 'Minimum required monthly contribution',
       description: 'Minimum monthly contributions until the last month to reach the investment goal, assuming the set annual growth.',
@@ -42,6 +47,12 @@ export function MinRequiredContributionsChart({ title, data, config }: MinRequir
       description: 'Projected contributions adjusted to the EUNL trend after the last recorded month.',
       color: '#10b981',
       strokeDasharray: '5 5',
+      variant: 'line'
+    },
+    {
+      label: 'Expected estimate',
+      description: 'Expected trajectory of monthly contribution requirement based on current savings.',
+      color: '#06b6d4',
       variant: 'line'
     },
     {
@@ -120,6 +131,58 @@ export function MinRequiredContributionsChart({ title, data, config }: MinRequir
     
     return enhancedData;
   }, [data]);
+  const rightAxisDomain = React.useMemo(() => {
+    if (!chartData || chartData.length === 0) return [0, 0] as [number, number];
+    const keys = [
+      'minRequiredContributionArea',
+      'minRequiredContributionLine',
+      'minRequiredContributionAdjustedArea',
+      'minRequiredContributionAdjustedLine',
+      'targetLine',
+      'expectedMinRequiredContribution'
+    ] as const;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    chartData.forEach((item) => {
+      keys.forEach((key) => {
+        const value = item[key];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          min = Math.min(min, value);
+          max = Math.max(max, value);
+        }
+      });
+    });
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return [0, 0] as [number, number];
+    }
+    return [min, max] as [number, number];
+  }, [chartData]);
+  const progressAxis = React.useMemo(() => {
+    const firstValue = chartData.length > 0 ? chartData[0]?.minRequiredContribution : null;
+    if (typeof firstValue !== 'number' || !Number.isFinite(firstValue) || firstValue <= 0) {
+      return { ticks: [] as number[], entries: [] as Array<{ value: number; label: string }>, labelByValue: new Map<number, string>() };
+    }
+    const percentSteps = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    const entries = percentSteps.map((percent) => ({
+      value: firstValue * (1 - percent / 100),
+      label: `${percent} %`
+    }));
+    const [domainMin, domainMax] = rightAxisDomain;
+    const visibleEntries = entries.filter((entry) => entry.value >= domainMin && entry.value <= domainMax);
+    const usedEntries = visibleEntries.length > 0 ? visibleEntries : entries;
+    const ticks = usedEntries.map((entry) => entry.value);
+    const labelByValue = new Map<number, string>();
+    usedEntries.forEach((entry) => {
+      labelByValue.set(entry.value, entry.label);
+    });
+    return { ticks, entries: usedEntries, labelByValue };
+  }, [chartData, rightAxisDomain]);
+  const isWithinRightAxisDomain = React.useCallback((value: number) => {
+    return value >= rightAxisDomain[0] && value <= rightAxisDomain[1];
+  }, [rightAxisDomain]);
+  const leftAnchorX = React.useMemo(() => {
+    return chartData.length > 0 ? chartData[0]?.dateFormatted : null;
+  }, [chartData]);
   const latestAdjustedContributionPoint = React.useMemo(() => {
     const latestWithAdjusted = [...chartData]
       .reverse()
@@ -145,10 +208,37 @@ export function MinRequiredContributionsChart({ title, data, config }: MinRequir
             axisLine={{ stroke: 'hsl(var(--border))' }}
           />
           <YAxis 
+            yAxisId="progress"
+            type="number"
+            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+            axisLine={{ stroke: 'hsl(var(--border))' }}
+            ticks={progressAxis.ticks.length > 0 ? progressAxis.ticks : undefined}
+            domain={rightAxisDomain}
+            tickFormatter={(value) => {
+              const numericValue = typeof value === 'number' ? value : parseFloat(String(value));
+              if (Number.isNaN(numericValue)) return '';
+              const directLabel = progressAxis.labelByValue.get(numericValue);
+              if (directLabel) return directLabel;
+              let closestLabel = '';
+              let closestDistance = Number.POSITIVE_INFINITY;
+              progressAxis.entries.forEach((entry) => {
+                const distance = Math.abs(entry.value - numericValue);
+                if (distance < closestDistance) {
+                  closestDistance = distance;
+                  closestLabel = entry.label;
+                }
+              });
+              return closestLabel;
+            }}
+            interval={0}
+            width={46}
+            orientation="left"
+          />
+          <YAxis 
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickFormatter={(value) => isPrivacyMode ? '•••' : formatCurrency(value)}
-            domain={['dataMin', 'dataMax']}
+            domain={rightAxisDomain}
             orientation="right"
           />
           {!isPrivacyMode && (
@@ -165,9 +255,23 @@ export function MinRequiredContributionsChart({ title, data, config }: MinRequir
                              name === 'minRequiredContributionLine' ? 'Target minimum required contribution' :
                              name === 'minRequiredContributionAdjustedArea' ? 'Monthly contribution adjusted for EUNL trend' :
                              name === 'minRequiredContributionAdjustedLine' ? 'Target contribution adjusted for EUNL trend' :
+                             name === 'expectedMinRequiredContribution' ? 'Expected estimate' :
                              name === 'targetLine' ? 'Target' : 'Unknown';
                 return [formatCurrency(value as number), label];
               }}
+            />
+          )}
+          {latestAdjustedContributionPoint !== null
+            && leftAnchorX
+            && isWithinRightAxisDomain(latestAdjustedContributionPoint.y) && (
+            <ReferenceLine
+              segment={[
+                { x: leftAnchorX, y: latestAdjustedContributionPoint.y },
+                { x: latestAdjustedContributionPoint.x, y: latestAdjustedContributionPoint.y }
+              ]}
+              stroke="#6b7280"
+              strokeDasharray="4 4"
+              ifOverflow="extendDomain"
             />
           )}
           <Area 
@@ -219,12 +323,32 @@ export function MinRequiredContributionsChart({ title, data, config }: MinRequir
             activeDot={{ r: 3, fill: '#10b981' }}
           />
           <Line 
+            type="monotone"
+            dataKey="expectedMinRequiredContribution"
+            stroke="#06b6d4"
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: '#06b6d4' }}
+          />
+          <Line 
             type="monotone" 
             dataKey="targetLine"
             stroke="#f59e0b" 
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4, fill: '#f59e0b' }}
+          />
+          <Line 
+            type="monotone"
+            dataKey="minRequiredContributionArea"
+            yAxisId="progress"
+            stroke="rgba(0, 0, 0, 0)"
+            strokeWidth={1}
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            isAnimationActive={false}
+            tooltipType="none"
           />
         </AreaChart>
       </ResponsiveContainer>

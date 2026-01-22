@@ -26,11 +26,10 @@ function LegendSwatch({
 }): React.JSX.Element {
   if (variant === 'note') {
     return (
-      <span
-        className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px] text-muted-foreground"
-        aria-hidden="true"
-      >
-        i
+      <span className="inline-flex h-[10px] w-[24px] items-center justify-center" aria-hidden="true">
+        <span className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px] text-muted-foreground">
+          i
+        </span>
       </span>
     );
   }

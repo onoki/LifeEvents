@@ -104,6 +104,8 @@ export function calculateTargetWithFixedContribution(
     plannedMinRequired: 0,
     latestMinRequired: 0,
     latestMinRequiredAdjusted: 0,
+    expectedProjectionValue: 0,
+    expectedMinRequired: 0,
   };
   
   // Initialize planned min required contribution for first month
@@ -255,6 +257,36 @@ export function calculateTargetWithFixedContribution(
       }
     }
     
+    // Calculate expected minimum required contribution based on current savings
+    let expectedMinRequiredContribution: number | null = null;
+    if (latestDataPointIndex >= 0) {
+      if (isLatestDataPoint) {
+        projectionState.expectedProjectionValue = projectionStartValue;
+        expectedMinRequiredContribution = calculateMinRequiredContribution(
+          projectionState.expectedProjectionValue,
+          investmentGoal,
+          monthlyGrowthRate,
+          monthsRemaining
+        );
+        projectionState.expectedMinRequired = expectedMinRequiredContribution;
+      } else if (isFuturePoint) {
+        projectionState.expectedProjectionValue = projectionState.expectedProjectionValue * (1 + monthlyGrowthRate)
+          + (contributesThisMonth ? plannedMonthlyContribution : 0);
+
+        if (hasValidPlannedUntil && item.date > plannedUntilDate!) {
+          expectedMinRequiredContribution = projectionState.expectedMinRequired;
+        } else {
+          expectedMinRequiredContribution = calculateMinRequiredContribution(
+            projectionState.expectedProjectionValue,
+            investmentGoal,
+            monthlyGrowthRate,
+            monthsRemaining
+          );
+          projectionState.expectedMinRequired = expectedMinRequiredContribution;
+        }
+      }
+    }
+
     // Calculate adjusted stock value
     const stocksInEurAdjusted = adjustedValue;
     
@@ -272,7 +304,8 @@ export function calculateTargetWithFixedContribution(
       stocks_in_eur_adjusted_for_eunl_trend: stocksInEurAdjusted,
       targetWithFixedContribution: Math.max(0, targetValue),
       minRequiredContribution: minRequiredContribution,
-      minRequiredContributionAdjustedForEUNLTrend: minRequiredContributionAdjusted
+      minRequiredContributionAdjustedForEUNLTrend: minRequiredContributionAdjusted,
+      expectedMinRequiredContribution: expectedMinRequiredContribution !== null ? Math.max(0, expectedMinRequiredContribution) : null
     };
     
     return resultItem;

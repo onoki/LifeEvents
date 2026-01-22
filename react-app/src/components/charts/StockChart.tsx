@@ -115,6 +115,11 @@ export function StockChart({
     : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
   const legendItems = React.useMemo(() => ([
     {
+      label: 'Percentage (left Y axis)',
+      description: 'Progress to reach the savings target.',
+      variant: 'note'
+    },
+    {
       label: 'Current value of owned stocks',
       description: 'The actual value of owned stocks.',
       color: '#3b82f6',

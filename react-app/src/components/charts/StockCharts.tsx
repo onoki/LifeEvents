@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ViewModeToggle } from './ViewModeToggle';
 import { StockChart } from './StockChart';
 import { MinRequiredContributionsChart } from './MinRequiredContributionsChart';
 import { EUNLChart } from './EUNLChart';
 import { ConditionsTable } from './ConditionsTable';
 import { useFinancialCalculations } from '../../hooks/use-financial-calculations';
-import type { StockChartsProps, ViewMode } from '../../types';
+import type { StockChartsProps } from '../../types';
 
 /**
  * Stock Charts Container Component
@@ -18,10 +18,11 @@ export function StockCharts({
   eunlData, 
   onFetchEUNL, 
   loading,
+  viewMode,
+  onViewModeChange,
   eunlTrendStats,
   eunlError
 }: StockChartsProps): React.JSX.Element {
-  const [viewMode, setViewMode] = useState<ViewMode>('next2years');
 
   if (!data || data.length === 0) {
     return (
@@ -59,7 +60,7 @@ export function StockCharts({
   return (
     <div className="space-y-6">
       {/* View Mode Toggle Control */}
-      <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+      <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
 
       {/* Owned stocks chart - full width */}
       <div className="mb-8">

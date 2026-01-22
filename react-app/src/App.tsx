@@ -3,14 +3,17 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { KPICards } from '@/components/kpi/KPICards'
 import { StockCharts } from '@/components/charts/StockCharts'
+import { ViewModeToggle } from '@/components/charts/ViewModeToggle'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useAppStore } from './store/use-app-store'
 import { usePrivacyMode } from './hooks/use-privacy-mode'
 import { APP_CONFIG } from './config/app-config'
 import './styles/accessibility.css'
+import type { ViewMode } from './types'
 
 function App(): React.JSX.Element {
   const [sheetsUrl, setSheetsUrl] = useState<string>('')
+  const [viewMode, setViewMode] = useState<ViewMode>('next2years')
   const { 
     data, 
     config, 
@@ -90,6 +93,8 @@ function App(): React.JSX.Element {
               eunlData={eunlData} 
               onFetchEUNL={handleFetchEUNL}
               loading={loading}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
               eunlTrendStats={eunlTrendStats}
               eunlError={eunlError}
             />
@@ -136,6 +141,12 @@ function App(): React.JSX.Element {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {data && data.length > 0 && (
+          <div className="mt-8">
+            <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+          </div>
         )}
 
         {/* Privacy Toggle Link - Only show "Hide exact values" when not in privacy mode */}
