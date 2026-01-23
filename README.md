@@ -4,7 +4,7 @@ Life Events KPI Tracker is a React + TypeScript web app for tracking life events
 
 ## Features
 
-- KPI cards for work progress, family leave, and retirement.
+- KPI cards for work progress, focused savings, and retirement.
 - Stock value chart with target lines, growth scenarios, and reward milestones.
 - Minimum required contribution and planned contribution projections.
 - EUNL ETF history with trend and confidence bands (fetched on demand from Yahoo Finance via a CORS proxy).

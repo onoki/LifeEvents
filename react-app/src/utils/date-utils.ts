@@ -173,90 +173,6 @@ export function getWorkTimeFormatted(currentTime: Date): string {
 }
 
 /**
- * Calculate time remaining until family leave
- */
-export function getFamilyLeaveTimeFormatted(currentTime: Date): string {
-  const now = currentTime;
-  const familyLeaveStart = new Date(APP_CONFIG.DATES.FAMILY_LEAVE_START);
-  const familyLeaveEnd = new Date(APP_CONFIG.DATES.FAMILY_LEAVE_END);
-  
-  // If before start date, show time until start
-  if (now < familyLeaveStart) {
-    const diffMs = familyLeaveStart.getTime() - now.getTime();
-    const diffMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
-    const diffDays = Math.floor((diffMs % (1000 * 60 * 60 * 24 * 30.44)) / (1000 * 60 * 60 * 24));
-    
-    let result = '';
-    if (diffMonths > 0) result += `${diffMonths} m `;
-    if (diffDays > 0) result += `${diffDays} d`;
-    return result.trim() || "0 d";
-  }
-  
-  // If after end date, show 0
-  if (now > familyLeaveEnd) {
-    return "0 d";
-  }
-  
-  // During family leave period, show time until end
-  const diffMs = familyLeaveEnd.getTime() - now.getTime();
-  const diffMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
-  const diffDays = Math.floor((diffMs % (1000 * 60 * 60 * 24 * 30.44)) / (1000 * 60 * 60 * 24));
-  
-  let result = '';
-  if (diffMonths > 0) result += `${diffMonths} m `;
-  if (diffDays > 0) result += `${diffDays} d`;
-  return result.trim() || "0 d";
-}
-
-/**
- * Calculate family leave workdays
- */
-export function getFamilyLeaveWorkdays(currentTime: Date): number {
-  const now = currentTime;
-  const familyLeaveStart = new Date(APP_CONFIG.DATES.FAMILY_LEAVE_START);
-  const familyLeaveEnd = new Date(APP_CONFIG.DATES.FAMILY_LEAVE_END);
-  
-  // If before start date, calculate workdays until start
-  if (now < familyLeaveStart) {
-    return countWorkdays(now, familyLeaveStart);
-  }
-  
-  // If after end date, show 0
-  if (now > familyLeaveEnd) {
-    return 0;
-  }
-  
-  // During family leave period, calculate workdays until end
-  return countWorkdays(now, familyLeaveEnd);
-}
-
-/**
- * Calculate family leave progress percentage
- */
-export function getFamilyLeaveProgress(currentTime: Date): number {
-  const now = currentTime;
-  const familyLeaveStart = new Date(APP_CONFIG.DATES.FAMILY_LEAVE_START);
-  const familyLeaveEnd = new Date(APP_CONFIG.DATES.FAMILY_LEAVE_END);
-  
-  // If before start date, show 0%
-  if (now < familyLeaveStart) {
-    return 0;
-  }
-  
-  // If after end date, show 100%
-  if (now > familyLeaveEnd) {
-    return 100;
-  }
-  
-  // Calculate progress percentage
-  const totalTime = familyLeaveEnd.getTime() - familyLeaveStart.getTime();
-  const elapsedTime = now.getTime() - familyLeaveStart.getTime();
-  const progress = (elapsedTime / totalTime) * 100;
-  
-  return Math.min(100, Math.max(0, progress));
-}
-
-/**
  * Calculate time remaining until retirement
  */
 export function getRetirementTimeFormatted(currentTime: Date): string {
@@ -353,13 +269,6 @@ export function getDaysToDate(targetDateString: string): number {
   const diffMs = targetDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
-}
-
-/**
- * Calculate days until family leave target date
- */
-export function getDaysToFamilyLeave(): number {
-  return getDaysToDate(APP_CONFIG.DATES.FAMILY_LEAVE_TARGET);
 }
 
 /**

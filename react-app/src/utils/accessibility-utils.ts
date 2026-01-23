@@ -53,7 +53,7 @@ export function generateButtonAriaLabel(
 export function generateAriaDescription(element: string): string {
   const descriptions: Record<string, string> = {
     workProgress: 'Shows current work day progress and time remaining until end of work day',
-    familyLeave: 'Shows family leave progress and time remaining until family leave period ends',
+    focusedSavings: 'Shows focused savings progress and time remaining until the planned contribution end date',
     retirement: 'Shows retirement progress and time remaining until retirement period ends',
     stockChart: 'Interactive chart showing stock value progression over time with target lines',
     eunlChart: 'Interactive chart showing EUNL ETF price history with trend analysis',

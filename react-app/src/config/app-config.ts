@@ -11,12 +11,9 @@ export const APP_CONFIG = {
 
   // Important dates
   DATES: {
-    FAMILY_LEAVE_START: '2024-06-24T08:30:00',
-    FAMILY_LEAVE_END: '2025-12-05T17:30:00',
     RETIREMENT_START: '2013-11-18T08:00:00',
     RETIREMENT_END: '2043-02-19T17:00:00',
     // Customizable dates
-    FAMILY_LEAVE_TARGET: '2024-12-25', // Christmas
     RETIREMENT_TARGET: '2050-01-01',
   },
 

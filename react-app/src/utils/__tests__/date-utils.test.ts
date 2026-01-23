@@ -2,8 +2,6 @@ import {
   countWorkdays,
   getWorkProgress,
   getWorkTimeFormatted,
-  getFamilyLeaveTimeFormatted,
-  getFamilyLeaveProgress,
   getRetirementProgress,
   getDaysToDate,
 } from '../date-utils';
@@ -101,29 +99,6 @@ describe('dateUtils', () => {
       const duringWork = new Date('2024-01-01T12:00:00'); // Monday 12 PM
       const time = getWorkTimeFormatted(duringWork);
       expect(time).toMatch(/\d+ h \d+ min/);
-    });
-  });
-
-  describe('getFamilyLeaveTimeFormatted', () => {
-    it('should return formatted time string', () => {
-      const currentTime = new Date('2024-01-01T10:00:00');
-      const time = getFamilyLeaveTimeFormatted(currentTime);
-      expect(typeof time).toBe('string');
-      expect(time).toMatch(/\d+ [mdy]/);
-    });
-  });
-
-  describe('getFamilyLeaveProgress', () => {
-    it('should return 0% before family leave start', () => {
-      const beforeStart = new Date('2024-01-01T10:00:00');
-      const progress = getFamilyLeaveProgress(beforeStart);
-      expect(progress).toBe(0); // Function returns 0 for weekends/before work
-    });
-
-    it('should return 100% after family leave end', () => {
-      const afterEnd = new Date('2026-01-01T10:00:00');
-      const progress = getFamilyLeaveProgress(afterEnd);
-      expect(progress).toBe(100);
     });
   });
 

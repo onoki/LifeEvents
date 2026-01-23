@@ -3,13 +3,9 @@ import {
   getHoursToWorkEnd,
   getWorkProgress,
   getWorkTimeFormatted,
-  getFamilyLeaveTimeFormatted,
-  getFamilyLeaveProgress,
-  getFamilyLeaveWorkdays,
   getRetirementTimeFormatted,
   getRetirementProgress,
   getRetirementWorkdays,
-  getDaysToFamilyLeave,
   getDaysToRetirement,
 } from '../utils/date-utils';
 import { APP_CONFIG } from '../config/app-config';
@@ -19,12 +15,6 @@ export interface KPICalculations {
   hoursToWorkEnd: number;
   workProgress: number;
   workTimeFormatted: string;
-  
-  // Family leave calculations
-  familyLeaveTimeFormatted: string;
-  familyLeaveProgress: number;
-  familyLeaveWorkdays: number;
-  daysToFamilyLeave: number;
   
   // Retirement calculations
   retirementTimeFormatted: string;
@@ -58,12 +48,6 @@ export function useKPICalculations(): KPICalculations {
       hoursToWorkEnd: getHoursToWorkEnd(currentTime),
       workProgress: getWorkProgress(currentTime),
       workTimeFormatted: getWorkTimeFormatted(currentTime),
-      
-      // Family leave calculations
-      familyLeaveTimeFormatted: getFamilyLeaveTimeFormatted(currentTime),
-      familyLeaveProgress: getFamilyLeaveProgress(currentTime),
-      familyLeaveWorkdays: getFamilyLeaveWorkdays(currentTime),
-      daysToFamilyLeave: getDaysToFamilyLeave(),
       
       // Retirement calculations
       retirementTimeFormatted: getRetirementTimeFormatted(currentTime),
