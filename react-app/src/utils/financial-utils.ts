@@ -5,6 +5,33 @@ import { parseNumeric } from './number-utils';
 /**
  * Calculate target value with fixed monthly contribution
  */
+export function calculateRequiredMonthlyContribution(
+  currentValue: number,
+  goal: number,
+  annualGrowthRate: number,
+  monthsRemaining: number
+): number {
+  if (!Number.isFinite(currentValue) || !Number.isFinite(goal) || !Number.isFinite(annualGrowthRate)) {
+    return 0;
+  }
+  if (monthsRemaining <= 0) return 0;
+  const monthlyRate = annualGrowthRate / 12;
+  if (monthlyRate === 0) {
+    return Math.max(0, (goal - currentValue) / monthsRemaining);
+  }
+  const pow1p = (rate: number, n: number) => Math.pow(1 + rate, n);
+  const annuityFactor = (rate: number, n: number) => {
+    if (n <= 0) return 0;
+    if (rate === 0) return n;
+    return (pow1p(rate, n) - 1) / rate;
+  };
+  const futureValue = currentValue * pow1p(monthlyRate, monthsRemaining);
+  const remaining = goal - futureValue;
+  const denominator = annuityFactor(monthlyRate, monthsRemaining);
+  if (denominator === 0) return 0;
+  return Math.max(0, remaining / denominator);
+}
+
 export function calculateTargetWithFixedContribution(
   data: Event[],
   config: Config,

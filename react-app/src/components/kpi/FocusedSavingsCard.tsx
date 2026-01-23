@@ -73,10 +73,10 @@ export function FocusedSavingsCard({ config }: FocusedSavingsCardProps): React.J
 
   return (
     <Card className="border-gray-600">
-      <CardContent className="pt-6 pb-6 px-2 sm:px-6 flex flex-col h-full">
+      <CardContent className="pt-5 pb-5 px-2 sm:px-5 flex flex-col h-full">
         <div className="flex justify-between items-center flex-grow">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 text-gray-600 flex items-center justify-center">
+            <div className="w-7 h-7 text-gray-600 flex items-center justify-center">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
@@ -85,20 +85,20 @@ export function FocusedSavingsCard({ config }: FocusedSavingsCardProps): React.J
               </svg>
             </div>
             <div>
-              <div className="text-3xl font-bold">{timeRemaining}</div>
-              <div className="text-lg font-medium text-gray-500">
+              <div className="text-2xl font-bold">{timeRemaining}</div>
+              <div className="text-base font-medium text-gray-500">
                 {workdaysRemaining.toLocaleString('en-US').replace(/,/g, ' ')} workdays
               </div>
             </div>
           </div>
-          <div className="text-lg font-semibold text-gray-600">
-            {formatPercentage(progress)}
+          <div className="text-base font-semibold text-gray-600">
+            {formatPercentage(progress, 2)}
           </div>
         </div>
         <div className="mt-auto pt-2">
-          <div className="w-full bg-gray-600 rounded-lg h-8">
+          <div className="w-full bg-gray-600 rounded-lg h-7">
             <div
-              className="bg-white h-8 rounded-lg transition-all duration-300"
+              className="bg-white h-7 rounded-lg transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>

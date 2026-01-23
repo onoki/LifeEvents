@@ -18,6 +18,12 @@ export interface Condition {
   explanation_long?: string;
 }
 
+export interface MiniReward {
+  percentage: number;
+  taken: boolean;
+  takenRaw?: string;
+}
+
 export interface Config {
   [key: string]: string | undefined;
   investment_goal?: string;
@@ -67,7 +73,7 @@ export interface MilestoneMarker {
 export interface KPICardsProps {
   data: Event[];
   config: Config;
-  conditions: Condition[];
+  miniRewards: MiniReward[];
 }
 
 export interface StockChartsProps {

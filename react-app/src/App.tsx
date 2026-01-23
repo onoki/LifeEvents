@@ -18,6 +18,7 @@ function App(): React.JSX.Element {
     data, 
     config, 
     conditions, 
+    miniRewards,
     loading, 
     error, 
     loadData, 
@@ -83,7 +84,7 @@ function App(): React.JSX.Element {
         {data && data.length > 0 && (
           <>
             {/* KPI Cards */}
-            <KPICards data={data} config={config} conditions={conditions} />
+            <KPICards data={data} config={config} miniRewards={miniRewards} />
             
             {/* Stock Charts */}
             <StockCharts 

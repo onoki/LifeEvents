@@ -1,4 +1,4 @@
-import type { Event, Condition, Config, ViewMode, ChartDataPoint, MilestoneMarker } from '../types';
+import type { Event, Condition, Config, ViewMode, ChartDataPoint, MilestoneMarker, MiniReward } from '../types';
 import { APP_CONFIG } from '../config/app-config';
 import { parseNumeric } from './number-utils';
 
@@ -43,13 +43,14 @@ export function processEventData(event: Record<string, string>): Event {
 /**
  * Parse TSV data from Google Sheets
  */
-export function parseTSVData(tsvText: string): { config: Config; conditions: Condition[]; data: Event[] } {
+export function parseTSVData(tsvText: string): { config: Config; conditions: Condition[]; data: Event[]; miniRewards: MiniReward[] } {
   const lines = tsvText.trim().split('\n');
   
   // Parse configuration parameters (first few lines)
   const configData: Config = {};
   let conditionsStartIndex = 0;
   let dataStartIndex = 0;
+  let miniRewardsStartIndex = -1;
   
   // Look for config lines first
   for (let i = 0; i < lines.length; i++) {
@@ -99,11 +100,25 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
     }
   }
   
+  // Find mini reward header if it exists (after data rows)
+  for (let i = dataStartIndex; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const [firstCell] = line.split('\t');
+    if (firstCell && firstCell.trim() === 'mini_reward_percentage') {
+      miniRewardsStartIndex = i;
+      break;
+    }
+  }
+
   // Parse the actual data starting from the date header
-  const dataLines = lines.slice(dataStartIndex - 1);
+  const dataLines = lines.slice(
+    dataStartIndex - 1,
+    miniRewardsStartIndex > 0 ? miniRewardsStartIndex : lines.length
+  );
   
   if (dataLines.length === 0) {
-    return { config: configData, conditions: conditionsData, data: [] };
+    return { config: configData, conditions: conditionsData, data: [], miniRewards: [] };
   }
   
   const headers = dataLines[0].split('\t').map(h => h.trim());
@@ -119,7 +134,32 @@ export function parseTSVData(tsvText: string): { config: Config; conditions: Con
     return processEventData(event);
   }).filter(event => event.date);
   
-  return { config: configData, conditions: conditionsData, data: parsedData };
+  const miniRewards: MiniReward[] = [];
+  if (miniRewardsStartIndex > -1) {
+    const rewardLines = lines.slice(miniRewardsStartIndex);
+    const rewardHeaders = rewardLines[0].split('\t').map(h => h.trim());
+    const percentageIndex = rewardHeaders.indexOf('mini_reward_percentage');
+    const takenIndex = rewardHeaders.indexOf('mini_reward_taken');
+
+    for (let i = 1; i < rewardLines.length; i++) {
+      const line = rewardLines[i].trim();
+      if (!line) continue;
+      const values = line.split('\t').map(v => v.trim());
+      const percentageRaw = values[percentageIndex] || '';
+      const percentage = parseNumeric(percentageRaw);
+      if (!Number.isFinite(percentage)) {
+        continue;
+      }
+      const takenRaw = values[takenIndex] || '';
+      miniRewards.push({
+        percentage,
+        taken: Boolean(takenRaw),
+        takenRaw
+      });
+    }
+  }
+
+  return { config: configData, conditions: conditionsData, data: parsedData, miniRewards };
 }
 
 /**

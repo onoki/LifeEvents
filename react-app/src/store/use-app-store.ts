@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { Event, Config, Condition, EUNLDataPoint } from '../types';
+import type { Event, Config, Condition, EUNLDataPoint, MiniReward } from '../types';
 
 interface AppState {
   // Data state
   data: Event[];
   config: Config;
   conditions: Condition[];
+  miniRewards: MiniReward[];
   eunlData: EUNLDataPoint[];
   eunlTrendStats: { annualGrowthRate: number, standardDeviation: number } | null;
   eunlError: string | null;
@@ -21,6 +22,7 @@ interface AppState {
   setData: (data: Event[]) => void;
   setConfig: (config: Config) => void;
   setConditions: (conditions: Condition[]) => void;
+  setMiniRewards: (miniRewards: MiniReward[]) => void;
   setEunlData: (data: EUNLDataPoint[]) => void;
   setEunlTrendStats: (stats: { annualGrowthRate: number, standardDeviation: number } | null) => void;
   setEunlError: (error: string | null) => void;
@@ -39,6 +41,7 @@ const initialState = {
   data: [],
   config: {},
   conditions: [],
+  miniRewards: [],
   eunlData: [],
   eunlTrendStats: null,
   eunlError: null,
@@ -57,6 +60,7 @@ export const useAppStore = create<AppState>()(
       setData: (data) => set({ data }),
       setConfig: (config) => set({ config }),
       setConditions: (conditions) => set({ conditions }),
+      setMiniRewards: (miniRewards) => set({ miniRewards }),
       setEunlData: (eunlData) => set({ eunlData }),
       setEunlTrendStats: (eunlTrendStats) => set({ eunlTrendStats }),
       setEunlError: (eunlError) => set({ eunlError }),
@@ -80,7 +84,7 @@ export const useAppStore = create<AppState>()(
           }
 
           const tsvData = await response.text();
-          const { config: parsedConfig, conditions: parsedConditions, data: parsedData } = parseTSVData(tsvData);
+          const { config: parsedConfig, conditions: parsedConditions, data: parsedData, miniRewards: parsedMiniRewards } = parseTSVData(tsvData);
           
           if (parsedData.length === 0) {
             throw new Error(APP_CONFIG.ERRORS.NO_DATA);
@@ -89,8 +93,9 @@ export const useAppStore = create<AppState>()(
           set({ 
             config: parsedConfig, 
             conditions: parsedConditions, 
+            miniRewards: parsedMiniRewards,
             data: parsedData,
-            status: `Loaded ${parsedData.length} events and ${parsedConditions.length} conditions successfully`
+            status: `Loaded ${parsedData.length} events, ${parsedConditions.length} conditions, and ${parsedMiniRewards.length} mini rewards successfully`
           });
           
         } catch (err) {
