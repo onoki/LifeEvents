@@ -10,6 +10,33 @@ import { ChartLegend } from './ChartLegend';
  * EUNL Chart Component
  * Displays EUNL ETF price history with exponential trend line
  */
+const EUNL_LEGEND_ITEMS = [
+  {
+    label: 'EUNL Price',
+    description: 'The actual price of one MSCI World ETF (EUNL).',
+    color: '#06b6d4',
+    variant: 'area'
+  },
+  {
+    label: 'Trend',
+    description: 'Price trend from the whole history of EUNL.',
+    color: '#ef4444',
+    variant: 'line'
+  },
+  {
+    label: 'Standard deviation',
+    description: 'Standard deviation of the price from the whole history of EUNL.',
+    color: '#ef4444',
+    strokeDasharray: '5 5',
+    variant: 'line'
+  },
+  {
+    label: 'Multiplier',
+    description: 'Trend divided by price. Used to convert the current value of the stocks to the trend in the other charts.',
+    variant: 'note'
+  }
+] as const;
+
 export function EUNLChart({ 
   title, 
   data, 
@@ -21,34 +48,93 @@ export function EUNLChart({
   trendStats,
   eunlError
 }: EUNLChartProps): React.JSX.Element {
-  const legendItems = React.useMemo(() => ([
-    {
-      label: 'EUNL Price',
-      description: 'The actual price of one MSCI World ETF (EUNL).',
-      color: '#06b6d4',
-      variant: 'area'
-    },
-    {
-      label: 'Trend',
-      description: 'Price trend from the whole history of EUNL.',
-      color: '#ef4444',
-      variant: 'line'
-    },
-    {
-      label: 'Standard deviation',
-      description: 'Standard deviation of the price from the whole history of EUNL.',
-      color: '#ef4444',
-      strokeDasharray: '5 5',
-      variant: 'line'
-    },
-    {
-      label: 'Multiplier',
-      description: 'Trend divided by price. Used to convert the current value of the stocks to the trend in the other charts.',
-      variant: 'note'
+  const legendItems = EUNL_LEGEND_ITEMS;
+  const hasData = Boolean(data && data.length > 0);
+  const safeData = data ?? [];
+  const isEunlData = hasData && safeData[0].price !== undefined;
+  // Apply toggle filter if needed (only for display)
+  let filteredData = safeData;
+  
+  if (showOnlyDataWithStocks && hasData) {
+    // If this is EUNL data (has 'price' field), filter by date range of stocks data
+    if (isEunlData && stocksData && stocksData.length > 0) {
+      // Get the date range from stocks data that has actual values
+      const stocksWithData = stocksData.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
+      if (stocksWithData.length > 0) {
+        // Get the month boundaries from stocks data
+        const stocksDates = stocksWithData.map(item => item.date);
+        const minDate = new Date(Math.min(...stocksDates.map(date => date.getTime())));
+        const maxDate = new Date(Math.max(...stocksDates.map(date => date.getTime())));
+        
+        // Create month boundaries (start of month for min, end of month for max)
+        const minMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+        let maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0); // Last day of the month
+        
+        // Always extend by one additional month to show current month data
+        // This helps when you're at the beginning of a month and haven't invested yet
+        maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0); // One month beyond the last recorded month
+        
+        // If viewMode is 'next2years' or 'next5years', extend the range
+        if (viewMode === 'next2years' || viewMode === 'next5years') {
+          const yearsToAdd = viewMode === 'next5years' ? 5 : 2;
+          maxMonth = new Date(maxDate.getFullYear() + yearsToAdd, maxDate.getMonth() + 2, 0);
+        }
+        
+        // Filter EUNL data to the same month range
+        filteredData = safeData.filter(item => {
+          const itemDate = new Date(item.date);
+          return itemDate >= minMonth && itemDate <= maxMonth;
+        });
+      }
+    } else if (!isEunlData && 'stocks_in_eur' in safeData[0] && safeData[0].stocks_in_eur !== undefined) {
+      // This is stocks data - filter normally
+      filteredData = safeData.filter(item => 'stocks_in_eur' in item && item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
     }
-  ]), []);
+  }
+
+  const chartData = filteredData;
+  const latestEunlPoint = !isEunlData || chartData.length === 0
+    ? null
+    : chartData.reduce((latest, item) => (item.date > latest.date ? item : latest), chartData[0]);
+
+  const latestMetrics = (() => {
+    if (!latestEunlPoint) return null;
+    const price = latestEunlPoint.price ?? null;
+    const trend = latestEunlPoint.trend ?? null;
+    const trendLowerBound = latestEunlPoint.trendLowerBound ?? null;
+
+    const diffPct = price !== null && trend !== null && trend !== 0
+      ? ((price - trend) / trend) * 100
+      : null;
+
+    const sigmaAbs = trend !== null && trendLowerBound !== null
+      ? trend - trendLowerBound
+      : null;
+    const sigmasFromTrend = price !== null && trend !== null && sigmaAbs !== null && sigmaAbs !== 0
+      ? (price - trend) / sigmaAbs
+      : null;
+
+    const multiplier = latestEunlPoint.multiplier ?? (price !== null && trend !== null && price !== 0 ? trend / price : null);
+
+    return {
+      diffPct,
+      sigmasFromTrend,
+      multiplier
+    };
+  })();
+
+  const diffPctLabel = latestMetrics && Number.isFinite(latestMetrics.diffPct)
+    ? `${latestMetrics.diffPct >= 0 ? '+' : ''}${latestMetrics.diffPct.toFixed(2)} %`
+    : 'N/A';
+  const sigmasFromTrendLabel = latestMetrics && Number.isFinite(latestMetrics.sigmasFromTrend)
+    ? `${latestMetrics.sigmasFromTrend >= 0 ? '+' : ''}${latestMetrics.sigmasFromTrend.toFixed(2)} σ`
+    : 'N/A';
+  const multiplierLabel = latestMetrics && Number.isFinite(latestMetrics.multiplier)
+    ? `${latestMetrics.multiplier.toFixed(3)}x`
+    : 'N/A';
+
   // Show empty state if no EUNL data
-  if (!data || data.length === 0) {
+  if (!hasData) {
     return (
       <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
@@ -88,93 +174,6 @@ export function EUNLChart({
       </div>
     );
   }
-
-  const isEunlData = data.length > 0 && data[0].price !== undefined;
-  // Apply toggle filter if needed (only for display)
-  let filteredData = data;
-  
-  if (showOnlyDataWithStocks && data.length > 0) {
-    // If this is EUNL data (has 'price' field), filter by date range of stocks data
-    if (isEunlData && stocksData && stocksData.length > 0) {
-      // Get the date range from stocks data that has actual values
-      const stocksWithData = stocksData.filter(item => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
-      if (stocksWithData.length > 0) {
-        // Get the month boundaries from stocks data
-        const stocksDates = stocksWithData.map(item => item.date);
-        const minDate = new Date(Math.min(...stocksDates.map(date => date.getTime())));
-        const maxDate = new Date(Math.max(...stocksDates.map(date => date.getTime())));
-        
-        // Create month boundaries (start of month for min, end of month for max)
-        const minMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-        let maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0); // Last day of the month
-        
-        // Always extend by one additional month to show current month data
-        // This helps when you're at the beginning of a month and haven't invested yet
-        maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0); // One month beyond the last recorded month
-        
-        // If viewMode is 'next2years' or 'next5years', extend the range
-        if (viewMode === 'next2years' || viewMode === 'next5years') {
-          const yearsToAdd = viewMode === 'next5years' ? 5 : 2;
-          maxMonth = new Date(maxDate.getFullYear() + yearsToAdd, maxDate.getMonth() + 2, 0);
-        }
-        
-        // Filter EUNL data to the same month range
-        filteredData = data.filter(item => {
-          const itemDate = new Date(item.date);
-          return itemDate >= minMonth && itemDate <= maxMonth;
-        });
-      }
-    } else if (!isEunlData && 'stocks_in_eur' in data[0] && data[0].stocks_in_eur !== undefined) {
-      // This is stocks data - filter normally
-      filteredData = data.filter(item => 'stocks_in_eur' in item && item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
-    }
-  }
-
-  const chartData = filteredData;
-  const latestEunlPoint = React.useMemo(() => {
-    if (!isEunlData || chartData.length === 0) return null;
-    return chartData.reduce((latest, item) => (item.date > latest.date ? item : latest), chartData[0]);
-  }, [chartData, isEunlData]);
-
-  const latestMetrics = React.useMemo(() => {
-    if (!latestEunlPoint) return null;
-    const price = latestEunlPoint.price ?? null;
-    const trend = latestEunlPoint.trend ?? null;
-    const trendLowerBound = latestEunlPoint.trendLowerBound ?? null;
-
-    const diffPct = price !== null && trend !== null && trend !== 0
-      ? ((price - trend) / trend) * 100
-      : null;
-
-    const distanceToLower = price !== null && trendLowerBound !== null
-      ? price - trendLowerBound
-      : null;
-    const sigmaAbs = trend !== null && trendLowerBound !== null
-      ? trend - trendLowerBound
-      : null;
-    const sigmasFromLower = distanceToLower !== null && sigmaAbs !== null && sigmaAbs !== 0
-      ? distanceToLower / sigmaAbs
-      : null;
-
-    const multiplier = latestEunlPoint.multiplier ?? (price !== null && trend !== null && price !== 0 ? trend / price : null);
-
-    return {
-      diffPct,
-      distanceToLower,
-      sigmasFromLower,
-      multiplier
-    };
-  }, [latestEunlPoint]);
-
-  const diffPctLabel = latestMetrics && Number.isFinite(latestMetrics.diffPct)
-    ? `${latestMetrics.diffPct >= 0 ? '+' : ''}${latestMetrics.diffPct.toFixed(2)} %`
-    : 'N/A';
-  const sigmasFromLowerLabel = latestMetrics && Number.isFinite(latestMetrics.sigmasFromLower)
-    ? `${latestMetrics.sigmasFromLower.toFixed(2)} σ`
-    : 'N/A';
-  const multiplierLabel = latestMetrics && Number.isFinite(latestMetrics.multiplier)
-    ? `${latestMetrics.multiplier.toFixed(3)}x`
-    : 'N/A';
 
   return (
     <div className="bg-card border border-gray-600 rounded-lg p-6">
@@ -353,13 +352,10 @@ export function EUNLChart({
             suffix=" %"
           />)
           {latestMetrics && (
-            <div className="mt-2 flex flex-nowrap gap-x-4 text-sm">
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               <span className="whitespace-nowrap">
-                Latest vs trend: <span className="font-semibold text-foreground">{diffPctLabel}</span>
-              </span>
-              <span className="whitespace-nowrap">
-                Latest vs. -1 σ: <span className="font-semibold text-foreground">
-                  {sigmasFromLowerLabel !== 'N/A' ? `${sigmasFromLowerLabel.startsWith('-') ? '' : '+'}${sigmasFromLowerLabel}` : 'N/A'}
+                Latest vs trend: <span className="font-semibold text-foreground">
+                  {diffPctLabel}{sigmasFromTrendLabel !== 'N/A' ? ` (${sigmasFromTrendLabel})` : ' (N/A)'}
                 </span>
               </span>
               <span className="whitespace-nowrap">
