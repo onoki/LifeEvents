@@ -131,6 +131,50 @@ export function EUNLChart({
   }
 
   const chartData = filteredData;
+  const latestEunlPoint = React.useMemo(() => {
+    if (!isEunlData || chartData.length === 0) return null;
+    return chartData.reduce((latest, item) => (item.date > latest.date ? item : latest), chartData[0]);
+  }, [chartData, isEunlData]);
+
+  const latestMetrics = React.useMemo(() => {
+    if (!latestEunlPoint) return null;
+    const price = latestEunlPoint.price ?? null;
+    const trend = latestEunlPoint.trend ?? null;
+    const trendLowerBound = latestEunlPoint.trendLowerBound ?? null;
+
+    const diffPct = price !== null && trend !== null && trend !== 0
+      ? ((price - trend) / trend) * 100
+      : null;
+
+    const distanceToLower = price !== null && trendLowerBound !== null
+      ? price - trendLowerBound
+      : null;
+    const sigmaAbs = trend !== null && trendLowerBound !== null
+      ? trend - trendLowerBound
+      : null;
+    const sigmasFromLower = distanceToLower !== null && sigmaAbs !== null && sigmaAbs !== 0
+      ? distanceToLower / sigmaAbs
+      : null;
+
+    const multiplier = latestEunlPoint.multiplier ?? (price !== null && trend !== null && price !== 0 ? trend / price : null);
+
+    return {
+      diffPct,
+      distanceToLower,
+      sigmasFromLower,
+      multiplier
+    };
+  }, [latestEunlPoint]);
+
+  const diffPctLabel = latestMetrics && Number.isFinite(latestMetrics.diffPct)
+    ? `${latestMetrics.diffPct >= 0 ? '+' : ''}${latestMetrics.diffPct.toFixed(2)} %`
+    : 'N/A';
+  const sigmasFromLowerLabel = latestMetrics && Number.isFinite(latestMetrics.sigmasFromLower)
+    ? `${latestMetrics.sigmasFromLower.toFixed(2)} σ`
+    : 'N/A';
+  const multiplierLabel = latestMetrics && Number.isFinite(latestMetrics.multiplier)
+    ? `${latestMetrics.multiplier.toFixed(3)}x`
+    : 'N/A';
 
   return (
     <div className="bg-card border border-gray-600 rounded-lg p-6">
@@ -193,8 +237,8 @@ export function EUNLChart({
               const nameMap: { [key: string]: string } = {
                 'price': 'EUNL Price',
                 'trend': 'Trend',
-                'trendUpperBound': 'Standard deviation (+1σ)',
-                'trendLowerBound': 'Standard deviation (-1σ)',
+                'trendUpperBound': 'Standard deviation (+1 σ)',
+                'trendLowerBound': 'Standard deviation (-1 σ)',
                 'multiplier': 'Multiplier (trend ÷ price)'
               };
 
@@ -308,6 +352,21 @@ export function EUNLChart({
             className="font-semibold text-foreground"
             suffix=" %"
           />)
+          {latestMetrics && (
+            <div className="mt-2 flex flex-nowrap gap-x-4 text-sm">
+              <span className="whitespace-nowrap">
+                Latest vs trend: <span className="font-semibold text-foreground">{diffPctLabel}</span>
+              </span>
+              <span className="whitespace-nowrap">
+                Latest vs. -1 σ: <span className="font-semibold text-foreground">
+                  {sigmasFromLowerLabel !== 'N/A' ? `${sigmasFromLowerLabel.startsWith('-') ? '' : '+'}${sigmasFromLowerLabel}` : 'N/A'}
+                </span>
+              </span>
+              <span className="whitespace-nowrap">
+                Multiplier: <span className="font-semibold text-foreground">{multiplierLabel}</span>
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

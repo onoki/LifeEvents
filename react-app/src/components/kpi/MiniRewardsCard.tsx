@@ -8,9 +8,10 @@ import { APP_CONFIG } from '../../config/app-config';
 import type { Config, Event, MiniReward } from '../../types';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const DAYS_PER_MONTH = 365.2425 / 12;
 
-const monthsBetween = (start: Date, end: Date): number =>
-  (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+const daysBetween = (start: Date, end: Date): number =>
+  (end.getTime() - start.getTime()) / MS_PER_DAY;
 
 const getLastDate = (data: Event[]): Date | null => {
   let latest: Date | null = null;
@@ -50,7 +51,8 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
 
   const monthsRemainingNow = React.useMemo(() => {
     if (!lastDate) return 0;
-    return Math.max(0, monthsBetween(currentTime, lastDate));
+    const remainingDays = daysBetween(currentTime, lastDate);
+    return Math.max(0, remainingDays / DAYS_PER_MONTH);
   }, [currentTime, lastDate]);
 
   const initialRequired = React.useMemo(() => {
@@ -89,40 +91,102 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
     return Math.min(100, Math.floor(currentPercentRaw) + 1);
   }, [currentPercentRaw]);
 
-  const daysToNextPercent = React.useMemo(() => {
-    if (!lastDate || !Number.isFinite(initialRequired) || initialRequired <= 0) return null;
+  const nextPercentProjection = React.useMemo(() => {
+    if (!lastDate || !Number.isFinite(initialRequired) || initialRequired <= 0) {
+      return {
+        daysToNextPercent: null as number | null,
+        debug: { status: 'missing_last_date_or_initial_required' }
+      };
+    }
+
     const targetRequired = initialRequired * (1 - nextPercent / 100);
-    if (currentRequired <= targetRequired) return 0;
+    if (currentRequired <= targetRequired) {
+      return {
+        daysToNextPercent: 0,
+        debug: { status: 'already_met', targetRequired, currentRequired }
+      };
+    }
+
     const maxDays = Math.max(0, Math.ceil((lastDate.getTime() - currentTime.getTime()) / MS_PER_DAY));
-    if (maxDays === 0) return null;
+    if (maxDays === 0) {
+      return {
+        daysToNextPercent: null,
+        debug: { status: 'no_days_remaining', targetRequired, currentRequired, maxDays }
+      };
+    }
+
     let projectedValue = stockEstimate.currentEstimate;
     let dayCursor = new Date(currentTime);
     const dailyGrowthRate = annualGrowthRate / 365;
     const contributionPerDay = stockEstimate.contributionPerDay;
+    let lastProjectedRequired = currentRequired;
+    let lastProjectedValue = projectedValue;
+    let lastMonthsRemaining = Math.max(0, daysBetween(dayCursor, lastDate) / DAYS_PER_MONTH);
 
     for (let day = 1; day <= maxDays; day++) {
       projectedValue = projectedValue * (1 + dailyGrowthRate) + contributionPerDay;
       dayCursor = new Date(dayCursor.getTime() + MS_PER_DAY);
-      const monthsRemaining = Math.max(0, monthsBetween(dayCursor, lastDate));
+      const monthsRemaining = Math.max(0, daysBetween(dayCursor, lastDate) / DAYS_PER_MONTH);
       const projectedRequired = calculateRequiredMonthlyContribution(
         projectedValue,
         goal,
         annualGrowthRate,
         monthsRemaining
       );
+      lastProjectedValue = projectedValue;
+      lastProjectedRequired = projectedRequired;
+      lastMonthsRemaining = monthsRemaining;
+
       if (projectedRequired <= targetRequired) {
-        return day;
+        return {
+          daysToNextPercent: day,
+          debug: {
+            status: 'reached',
+            targetRequired,
+            dailyGrowthRate,
+            contributionPerDay,
+            maxDays,
+            reachedOnDay: day,
+            projectedValue,
+            projectedRequired,
+            monthsRemaining
+          }
+        };
       }
     }
-    return null;
-  }, [annualGrowthRate, currentRequired, currentTime, goal, initialRequired, lastDate, nextPercent, stockEstimate.contributionPerDay, stockEstimate.currentEstimate]);
+
+    return {
+      daysToNextPercent: null,
+      debug: {
+        status: 'not_reached',
+        targetRequired,
+        dailyGrowthRate,
+        contributionPerDay,
+        maxDays,
+        lastProjectedValue,
+        lastProjectedRequired,
+        lastMonthsRemaining
+      }
+    };
+  }, [
+    annualGrowthRate,
+    currentRequired,
+    currentTime,
+    goal,
+    initialRequired,
+    lastDate,
+    nextPercent,
+    stockEstimate.contributionPerDay,
+    stockEstimate.currentEstimate
+  ]);
+
+  const daysToNextPercent = nextPercentProjection.daysToNextPercent;
 
   const untakenRewards = React.useMemo(() => {
     if (!miniRewards || miniRewards.length === 0) return 0;
     return miniRewards.filter((reward) => reward.percentage <= currentPercent && !reward.taken).length;
   }, [currentPercent, miniRewards]);
 
-  const nextPercentLabel = `${nextPercent} %`;
   const daysLabel = daysToNextPercent === null ? 'Not reached' : `${daysToNextPercent} d`;
   const progressSegmentFloor = Math.max(0, Math.min(99, Math.floor(currentPercentRaw)));
   const progressSegmentCeil = Math.max(progressSegmentFloor + 1, Math.min(100, Math.ceil(currentPercentRaw)));
@@ -155,9 +219,6 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
             </div>
             <div>
               <div className="text-2xl font-bold">{daysLabel}</div>
-              <div className="text-base font-medium text-gray-500">
-                {nextPercentLabel}
-              </div>
             </div>
           </div>
           <div className="text-base font-semibold text-gray-600">
