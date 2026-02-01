@@ -40,16 +40,17 @@ export function calculateTargetWithFixedContribution(
   if (!data || data.length === 0) return [];
   
   // Financial calculation helpers
-  const pow1p = (rate: number, n: number) => Math.pow(1 + rate, n);
-  const annuityFactor = (rate: number, n: number) => {
-    if (n <= 0) return 0;
-    if (rate === 0) return n;
-    return (pow1p(rate, n) - 1) / rate;
+  const pow1p = (rate: number, months: number) => Math.pow(1 + rate, months);
+  // annuity factor means “how much 1 € per month turns into after N months at rate r"
+  const annuityFactor = (rate: number, monthsRemaining: number) => {
+    if (monthsRemaining <= 0) return 0;
+    if (rate === 0) return monthsRemaining;
+    return (pow1p(rate, monthsRemaining) - 1) / rate;
   };
-  const requiredPayment = (remaining: number, rate: number, n: number) => {
-    if (n <= 0) return 0;
-    if (rate === 0) return remaining / n;
-    return remaining / annuityFactor(rate, n);
+  const requiredPayment = (remaining: number, rate: number, monthsRemaining: number) => {
+    if (monthsRemaining <= 0) return 0;
+    if (rate === 0) return remaining / monthsRemaining;
+    return remaining / annuityFactor(rate, monthsRemaining);
   };
   const calculateMinRequiredContribution = (
     currentValue: number,
