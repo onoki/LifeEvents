@@ -344,7 +344,9 @@ export function EUNLChart({
             decimals={1}
             className="font-semibold text-foreground"
             suffix=" %"
-          />&nbsp;(± <CountUp 
+          />{' '}
+          (<span className="font-semibold text-foreground">±</span>{''}
+          <CountUp 
             key="standard-deviation"
             value={Math.round(trendStats.standardDeviation * 100 * 10) / 10} 
             decimals={1}
@@ -352,11 +354,14 @@ export function EUNLChart({
             suffix=" %"
           />)
           {latestMetrics && (
-            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
               <span className="whitespace-nowrap">
-                Latest vs trend: <span className="font-semibold text-foreground">
-                  {diffPctLabel}{sigmasFromTrendLabel !== 'N/A' ? ` (${sigmasFromTrendLabel})` : ' (N/A)'}
-                </span>
+                Latest vs trend: <span className="font-semibold text-foreground">{diffPctLabel}</span>{' '}
+                ({sigmasFromTrendLabel !== 'N/A' ? (
+                  <span className="font-semibold text-foreground">{sigmasFromTrendLabel}</span>
+                ) : (
+                  'N/A'
+                )})
               </span>
               <span className="whitespace-nowrap">
                 Multiplier: <span className="font-semibold text-foreground">{multiplierLabel}</span>
