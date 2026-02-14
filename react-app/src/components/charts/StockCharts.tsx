@@ -84,6 +84,7 @@ export function StockCharts({
         <MinRequiredContributionsChart 
           title="Minimum required monthly contributions to reach the goal" 
           data={filteredChartData}
+          fullData={fullChartData}
           config={config}
         />
         

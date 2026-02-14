@@ -115,6 +115,7 @@ export interface EUNLChartProps {
 export interface MinRequiredContributionsChartProps {
   title: string;
   data: ChartDataPoint[];
+  fullData?: ChartDataPoint[];
   config: Config;
 }
 
