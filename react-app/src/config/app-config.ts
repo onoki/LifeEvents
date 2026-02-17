@@ -26,9 +26,15 @@ export const APP_CONFIG = {
 
   // External API endpoints
   API: {
-    CORS_PROXY: 'https://api.allorigins.win/raw?url=',
     YAHOO_FINANCE_BASE: 'https://query1.finance.yahoo.com/v8/finance/chart',
     EUNL_SYMBOL: 'EUNL.DE',
+    // Keep multiple CORS proxies so one outage does not break EUNL fetching.
+    CORS_PROXIES: [
+      'https://corsproxy.io/?',
+      'https://api.allorigins.win/raw?url=',
+      'https://api.codetabs.com/v1/proxy?quest=',
+    ],
+    REQUEST_TIMEOUT_MS: 15000,
     YAHOO_FINANCE_PERIODS: {
       START: 1253862000, // 2009-09-25
       END: 2546985600,   // 2050-09-25

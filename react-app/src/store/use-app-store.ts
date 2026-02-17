@@ -116,62 +116,99 @@ export const useAppStore = create<AppState>()(
         set({ loading: true, eunlError: null, status: 'Fetching EUNL data from Yahoo Finance...' });
 
         try {
-          const proxyUrl = APP_CONFIG.API.CORS_PROXY;
           const yahooUrl = `${APP_CONFIG.API.YAHOO_FINANCE_BASE}/${APP_CONFIG.API.EUNL_SYMBOL}?period1=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.START}&period2=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.END}&interval=1mo`;
+          const sourceUrls = APP_CONFIG.API.CORS_PROXIES.map((proxyUrl) => {
+            let sourceName = proxyUrl;
+            try {
+              sourceName = new URL(proxyUrl).hostname;
+            } catch {
+              // Keep the raw value if URL parsing fails.
+            }
 
-          const fetchAttempt = async (): Promise<{ eunlDataWithTrend: EUNLDataPoint[]; trendStats: { annualGrowthRate: number, standardDeviation: number } | null; originalLength: number }> => {
-            const response = await fetch(proxyUrl + encodeURIComponent(yahooUrl));
+            return {
+              sourceName,
+              url: `${proxyUrl}${encodeURIComponent(yahooUrl)}`,
+            };
+          });
+
+          type YahooChartResponse = {
+            chart?: {
+              result?: Array<{
+                timestamp?: number[];
+                indicators?: {
+                  quote?: Array<{
+                    close?: Array<number | null>;
+                  }>;
+                };
+              }>;
+            };
+          };
+
+          const fetchWithTimeout = async (url: string): Promise<Response> => {
+            const timeoutController = new AbortController();
+            const timeoutId = setTimeout(() => timeoutController.abort(), APP_CONFIG.API.REQUEST_TIMEOUT_MS);
+
+            try {
+              return await fetch(url, { signal: timeoutController.signal });
+            } catch (error) {
+              if (error instanceof DOMException && error.name === 'AbortError') {
+                throw new Error(`Request timed out after ${APP_CONFIG.API.REQUEST_TIMEOUT_MS / 1000} seconds`);
+              }
+              throw error;
+            } finally {
+              clearTimeout(timeoutId);
+            }
+          };
+
+          const fetchAttempt = async (sourceUrl: string): Promise<{ eunlDataWithTrend: EUNLDataPoint[]; trendStats: { annualGrowthRate: number, standardDeviation: number } | null; originalLength: number }> => {
+            const response = await fetchWithTimeout(sourceUrl);
             
             if (!response.ok) {
               throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-  
-            const yahooData = await response.json();
-            
-            if (!yahooData.chart || !yahooData.chart.result || !yahooData.chart.result[0]) {
+
+            const yahooData = await response.json() as YahooChartResponse;
+            const result = yahooData.chart?.result?.[0];
+            const timestamps = result?.timestamp;
+            const closePrices = result?.indicators?.quote?.[0]?.close;
+
+            if (!timestamps || !closePrices) {
               throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
             }
-  
-            const result = yahooData.chart.result[0];
-            const timestamps = result.timestamp;
-            const closePrices = result.indicators.quote[0].close;
-  
+
             const eunlData: EUNLDataPoint[] = timestamps.map((timestamp: number, index: number) => ({
               date: new Date(timestamp * 1000),
-              price: closePrices[index] || null,
+              price: closePrices[index] ?? null,
               dateFormatted: new Date(timestamp * 1000).toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS_WITH_DAY)
             })).filter((item: EUNLDataPoint) => item.price !== null);
-  
+
             const { data: eunlDataWithTrend, trendStats } = calculateExponentialTrend(eunlData);
 
             return { eunlDataWithTrend, trendStats, originalLength: eunlData.length };
           };
 
-          let lastError: unknown = null;
+          const sourceErrors: string[] = [];
 
-          for (let attempt = 1; attempt <= 3; attempt++) {
+          for (const source of sourceUrls) {
             try {
-              const { eunlDataWithTrend, trendStats, originalLength } = await fetchAttempt();
+              set({ status: `Fetching EUNL data via ${source.sourceName}...` });
+              const { eunlDataWithTrend, trendStats, originalLength } = await fetchAttempt(source.url);
               set({ 
                 eunlData: eunlDataWithTrend,
                 eunlTrendStats: trendStats,
-                status: `Loaded ${originalLength} EUNL data points successfully`,
+                status: `Loaded ${originalLength} EUNL data points successfully via ${source.sourceName}`,
                 eunlError: null
               });
               return;
             } catch (err) {
-              lastError = err;
-              console.error(`Attempt ${attempt} failed to load EUNL data:`, err);
-              if (attempt < 3) {
-                set({ status: `Attempt ${attempt} failed. Retrying...` });
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
+              const errorMessage = err instanceof Error ? err.message : APP_CONFIG.ERRORS.FETCH_FAILED;
+              sourceErrors.push(`${source.sourceName}: ${errorMessage}`);
+              console.error(`Source ${source.sourceName} failed to load EUNL data:`, err);
             }
           }
 
-          const errorMessage = lastError instanceof Error ? lastError.message : APP_CONFIG.ERRORS.FETCH_FAILED;
           set({ 
-            eunlError: errorMessage,
+            eunlError: `All EUNL data sources failed. ${sourceErrors.join(' | ')}`,
             status: 'Error loading EUNL data'
           });
           
