@@ -6,6 +6,7 @@ import { parseNumeric } from '../../utils/number-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 import { ChartLegend } from './ChartLegend';
+import type { LegendItem } from './ChartLegend';
 
 type ScenarioKind = 'monthly-delta' | 'lump-sum' | 'pause' | 'loan-repay';
 
@@ -102,7 +103,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
   const plannedContributionDescription = isPrivacyMode
     ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions.'
     : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
-  const legendItems = React.useMemo(() => ([
+  const legendItems = React.useMemo<LegendItem[]>(() => ([
     {
       label: 'Percentage (left Y axis)',
       description: 'Progress to reach 0 \u20AC savings target.',
@@ -121,15 +122,15 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       variant: 'line'
     },
     {
-      label: 'Monthly contribution adjusted for EUNL trend',
-      description: 'Minimum monthly contributions adjusted to the trend of MSCI World ETF (EUNL) instead of the daily price.',
+      label: 'Monthly contribution adjusted for index trend',
+      description: 'Minimum monthly contributions adjusted to the selected index trend instead of the daily price.',
       color: '#8b5cf6',
       strokeDasharray: '5 5',
       variant: 'line'
     },
     {
-      label: 'Target contribution adjusted for EUNL trend',
-      description: 'Projected contributions adjusted to the EUNL trend after the last recorded month.',
+      label: 'Target contribution adjusted for index trend',
+      description: 'Projected contributions adjusted to the selected index trend after the last recorded month.',
       color: '#10b981',
       strokeDasharray: '5 5',
       variant: 'line'
@@ -485,8 +486,8 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
               formatter={(value, name) => {
                 const label = name === 'minRequiredContributionArea' ? 'Minimum required monthly contribution' : 
                              name === 'minRequiredContributionLine' ? 'Target minimum required contribution' :
-                             name === 'minRequiredContributionAdjustedArea' ? 'Monthly contribution adjusted for EUNL trend' :
-                             name === 'minRequiredContributionAdjustedLine' ? 'Target contribution adjusted for EUNL trend' :
+                             name === 'minRequiredContributionAdjustedArea' ? 'Monthly contribution adjusted for index trend' :
+                             name === 'minRequiredContributionAdjustedLine' ? 'Target contribution adjusted for index trend' :
                              name === 'expectedMinRequiredContribution' ? 'Expected estimate' :
                              name === 'targetLine' ? 'Target' : 'Unknown';
                 return [formatCurrency(value as number), label];

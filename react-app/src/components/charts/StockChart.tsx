@@ -7,6 +7,7 @@ import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 import { StockValueIndicator } from './StockValueIndicator';
 import { ChartLegend } from './ChartLegend';
+import type { LegendItem } from './ChartLegend';
 
 /**
  * Stock Chart Component
@@ -29,6 +30,7 @@ export function StockChart({
       'lineWithPlusOnePercentGrowth',
       'targetWithMinimumContribution',
       'lineWithTrendGrowth',
+      'lineWithTrendGrowthAndPlannedContribution',
       'lineWithMinusOnePercentGrowth',
       'stocks_in_eur',
       'stocks_in_eur_adjusted_for_eunl_trend',
@@ -106,14 +108,17 @@ export function StockChart({
     && investmentGoal >= rightAxisDomain[0]
     && investmentGoal <= rightAxisDomain[1];
   const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
-    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (EUNL trend)`
-    : 'Growth scenario (EUNL trend)';
+    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (average index trend)`
+    : 'Growth scenario (average index trend)';
+  const trendGrowthWithPlannedLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
+    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth + planned contributions`
+    : 'Growth + planned contributions';
   const plannedContributionAmount = config.planned_monthly_contribution;
   const plannedContributionUntil = config.planned_monthly_contributions_until;
   const plannedContributionDescription = isPrivacyMode
     ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions.'
     : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
-  const legendItems = React.useMemo(() => ([
+  const legendItems = React.useMemo<LegendItem[]>(() => ([
     {
       label: 'Percentage (left Y axis)',
       description: 'Progress to reach the savings target.',
@@ -126,8 +131,8 @@ export function StockChart({
       variant: 'area'
     },
     {
-      label: 'Current value adjusted for EUNL trend',
-      description: 'The stocks adjusted to the trend of MSCI World ETF (EUNL) instead of the daily price.',
+      label: 'Current value adjusted for index trend',
+      description: 'The stocks adjusted to the selected index trend instead of the daily price.',
       color: '#8b5cf6',
       strokeDasharray: '5 5',
       variant: 'line'
@@ -152,10 +157,18 @@ export function StockChart({
       hidden: isSimplified
     },
     {
-      label: 'Growth scenario (EUNL trend)',
-      description: 'Scenario based on the historical trend growth of EUNL.',
+      label: 'Growth scenario (average index trend)',
+      description: 'Scenario based on the average historical trend growth across the four indexes.',
       color: '#06b6d4',
       strokeDasharray: '5 5',
+      variant: 'line',
+      hidden: isSimplified
+    },
+    {
+      label: 'Growth + planned contributions',
+      description: 'Average index trend growth with planned monthly contributions until the configured planned-until date.',
+      color: '#06b6d4',
+      strokeDasharray: '2 4',
       variant: 'line',
       hidden: isSimplified
     },
@@ -186,13 +199,12 @@ export function StockChart({
   const TooltipCursor = (props: {
     points?: Array<{ x: number; y: number }>;
     x?: number;
-    y?: number;
     width?: number;
     height?: number;
     stroke?: string;
     coordinate?: { x: number; y: number };
   }) => {
-    const { points, x, y, width, height, stroke, coordinate } = props;
+    const { points, x, width, height, stroke, coordinate } = props;
     const cursorX = coordinate?.x ?? (points && points.length > 0 ? points[0].x : x);
     if (cursorX === undefined || width === undefined || height === undefined) return null;
     const cursorStroke = stroke || 'hsl(var(--border))';
@@ -273,13 +285,14 @@ export function StockChart({
               formatter={(value, name) => {
                 const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
                 const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
-                             name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value adjusted for EUNL trend' :
+                             name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value adjusted for index trend' :
                              name === 'plannedContributionLine' ? 'Planned contributions path' :
                              name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
                              name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
                              name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
                              name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
                              name === 'lineWithTrendGrowth' ? trendGrowthLabel :
+                             name === 'lineWithTrendGrowthAndPlannedContribution' ? trendGrowthWithPlannedLabel :
                              'Unknown';
                 return [formatCurrency(value as number), label];
               }}
@@ -331,6 +344,16 @@ export function StockChart({
             activeDot={{ r: 3, fill: '#06b6d4' }}
             hide={isSimplified || data.every(item => item.lineWithTrendGrowth == null)}
           />
+          <Line
+            type="monotone"
+            dataKey="lineWithTrendGrowthAndPlannedContribution"
+            stroke="#06b6d4"
+            strokeWidth={1}
+            strokeDasharray="2 4"
+            dot={false}
+            activeDot={{ r: 3, fill: '#06b6d4' }}
+            hide={isSimplified || data.every(item => item.lineWithTrendGrowthAndPlannedContribution == null)}
+          />
           {milestoneMarkers
             .filter((marker) => isWithinRightAxisDomain(marker.y))
             .map((marker) => {
@@ -376,7 +399,7 @@ export function StockChart({
             dot={false}
             activeDot={{ r: 3, fill: '#3b82f6' }}
           />
-          {/* 4b. Current value adjusted for EUNL trend */}
+          {/* 4b. Current value adjusted for index trend */}
           <Line 
             type="monotone" 
             dataKey="stocks_in_eur_adjusted_for_eunl_trend"

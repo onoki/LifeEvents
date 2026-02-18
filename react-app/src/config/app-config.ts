@@ -28,7 +28,7 @@ export const APP_CONFIG = {
   API: {
     YAHOO_FINANCE_BASE: 'https://query1.finance.yahoo.com/v8/finance/chart',
     EUNL_SYMBOL: 'EUNL.DE',
-    // Keep multiple CORS proxies so one outage does not break EUNL fetching.
+    // Keep multiple CORS proxies so one outage does not break index fetching.
     CORS_PROXIES: [
       'https://corsproxy.io/?',
       'https://api.allorigins.win/raw?url=',
@@ -39,6 +39,51 @@ export const APP_CONFIG = {
       START: 1253862000, // 2009-09-25
       END: 2546985600,   // 2050-09-25
     },
+    MORNINGSTAR: {
+      AUTH_PAGE_URL: 'https://indexes.morningstar.com/indexes/details/morningstar-developed-europe-screened-select-150-eur-FS0000JKWD?currency=EUR&tab=overview&variant=NR',
+      TIMESERIES_BASE: 'https://www.us-api.morningstar.com/QS-markets/chartservice/v2/timeseries',
+      START_DATE: '1900-01-01',
+      TRACK_MARKET_DATA: '3.6.3',
+      INST_ID: 'MSIND',
+      FREQUENCY: 'm',
+    },
+    INDEX_SERIES: [
+      {
+        symbol: 'EUNL.DE',
+        displayName: 'EUNL ETF',
+        shortLabel: 'EUNL',
+        source: 'yahoo',
+        sourceUrl: 'https://finance.yahoo.com/quote/EUNL.DE/',
+        color: '#3b82f6',
+      },
+      {
+        symbol: 'MSDESENE',
+        displayName: 'Morningstar Developed Europe Screened Select 150 (EUR) NR EUR',
+        shortLabel: 'MSDESENE',
+        source: 'morningstar',
+        queryKey: 'F00001QK2I',
+        sourceUrl: 'https://indexes.morningstar.com/indexes/details/morningstar-developed-europe-screened-select-150-eur-FS0000JKWD?currency=EUR&tab=overview&variant=NR',
+        color: '#f97316',
+      },
+      {
+        symbol: 'MSNASSNU',
+        displayName: 'Morningstar North America Sustainability Screened Select NR USD',
+        shortLabel: 'MSNASSNU',
+        source: 'morningstar',
+        queryKey: 'F00001QK3I',
+        sourceUrl: 'https://www.us-api.morningstar.com/QS-markets/chartservice/v2/timeseries?query=F00001QK3I:open,high,low,close,volume,previousClose&frequency=m&startDate=1900-01-01&endDate=2026-02-18&trackMarketData=3.6.3&instid=MSIND',
+        color: '#22c55e',
+      },
+      {
+        symbol: 'MDAPKSNU',
+        displayName: 'Morningstar Developed Asia Pacific ex Korea Sustainability Screened NR USD',
+        shortLabel: 'MDAPKSNU',
+        source: 'morningstar',
+        queryKey: 'F00001QK46',
+        sourceUrl: 'https://www.us-api.morningstar.com/QS-markets/chartservice/v2/timeseries?query=F00001QK46:open,high,low,close,volume,previousClose&frequency=m&startDate=1900-01-01&endDate=2026-02-18&trackMarketData=3.6.3&instid=MSIND',
+        color: '#a855f7',
+      },
+    ],
   },
 
   // Chart and UI settings

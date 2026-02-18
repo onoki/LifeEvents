@@ -22,12 +22,13 @@ function App(): React.JSX.Element {
     loading, 
     error, 
     loadData, 
-    eunlData, 
-    fetchEUNLData,
-    eunlTrendStats,
-    eunlError 
+    indexDataBySymbol,
+    indexTrendStatsBySymbol,
+    fetchIndexData,
+    averageIndexTrendStats,
+    indexError
   } = useAppStore()
-  const { isPrivacyMode, getPrivacyUrl, getPublicUrl } = usePrivacyMode()
+  const { isPrivacyMode, getPrivacyUrl } = usePrivacyMode()
 
   // Load URL from GET parameter on component mount
   useEffect(() => {
@@ -50,8 +51,8 @@ function App(): React.JSX.Element {
   }
 
 
-  const handleFetchEUNL = async (): Promise<void> => {
-    await fetchEUNLData()
+  const handleFetchIndexData = async (): Promise<void> => {
+    await fetchIndexData()
   }
 
   return (
@@ -91,13 +92,14 @@ function App(): React.JSX.Element {
               data={data} 
               config={config} 
               conditions={conditions}
-              eunlData={eunlData} 
-              onFetchEUNL={handleFetchEUNL}
+              indexDataBySymbol={indexDataBySymbol}
+              indexTrendStatsBySymbol={indexTrendStatsBySymbol}
+              onFetchIndexData={handleFetchIndexData}
               loading={loading}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-              eunlTrendStats={eunlTrendStats}
-              eunlError={eunlError}
+              averageIndexTrendStats={averageIndexTrendStats}
+              indexError={indexError}
             />
           </>
         )}

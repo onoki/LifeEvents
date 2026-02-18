@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { calculateTargetWithFixedContribution, processStocksData, calculateExponentialTrend } from '../utils/financial-utils';
+import { calculateTargetWithFixedContribution, processStocksData } from '../utils/financial-utils';
 import { filterDataByViewMode, calculateMilestoneMarkers } from '../utils/data-processing-utils';
-import type { Event, Config, Condition, ChartDataPoint, EUNLDataPoint, ViewMode, MilestoneMarker } from '../types';
+import type { Event, Config, Condition, ChartDataPoint, ViewMode, MilestoneMarker } from '../types';
 
 export interface FinancialCalculations {
   // Chart data
@@ -9,10 +9,7 @@ export interface FinancialCalculations {
   fullStocksData: ChartDataPoint[];
   filteredData: Event[];
   stocksData: ChartDataPoint[];
-  
-  // EUNL data
-  eunlChartData: EUNLDataPoint[];
-  
+
   // Milestone markers
   milestoneMarkers: MilestoneMarker[];
 }
@@ -24,7 +21,6 @@ export function useFinancialCalculations(
   data: Event[],
   config: Config,
   conditions: Condition[],
-  eunlData: EUNLDataPoint[],
   viewMode: ViewMode,
   trendAnnualGrowthRate?: number | null
 ): FinancialCalculations {
@@ -37,10 +33,7 @@ export function useFinancialCalculations(
     // Filter data based on view mode (only for display)
     const filteredData = filterDataByViewMode(data, viewMode);
     const stocksData = processStocksData(filteredData);
-    
-    // Calculate EUNL chart data with trend
-    const { data: eunlChartData } = calculateExponentialTrend(eunlData);
-    
+
     // Calculate milestone markers
     const milestoneMarkers = calculateMilestoneMarkers(fullChartData, conditions);
     
@@ -49,10 +42,9 @@ export function useFinancialCalculations(
       fullStocksData,
       filteredData,
       stocksData,
-      eunlChartData,
       milestoneMarkers,
     };
-  }, [data, config, conditions, eunlData, viewMode, trendAnnualGrowthRate]);
+  }, [data, config, conditions, viewMode, trendAnnualGrowthRate]);
 
   return calculations;
 }

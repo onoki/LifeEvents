@@ -127,6 +127,7 @@ export function calculateTargetWithFixedContribution(
     minusOnePercentLine: 0,
     plusOnePercentLine: 0,
     trendGrowthLine: 0,
+    trendGrowthWithPlannedContributionLine: 0,
     plannedContributionLine: firstAdjustedValue,
     plannedProjectionValue: firstAdjustedValue,
     plannedMinRequired: 0,
@@ -198,6 +199,7 @@ export function calculateTargetWithFixedContribution(
     let lineWithMinusOnePercentGrowth: number | null = null;
     let lineWithPlusOnePercentGrowth: number | null = null;
     let lineWithTrendGrowth: number | null = null;
+    let lineWithTrendGrowthAndPlannedContribution: number | null = null;
     
     if (isLatestDataPoint) {
       // Initialize projection lines at latest data point
@@ -206,6 +208,7 @@ export function calculateTargetWithFixedContribution(
       lineWithPlusOnePercentGrowth = projectionStartValue;
       if (hasTrendGrowth) {
         lineWithTrendGrowth = projectionStartValue;
+        lineWithTrendGrowthAndPlannedContribution = projectionStartValue;
       }
       
       // Reset state to current values
@@ -214,6 +217,7 @@ export function calculateTargetWithFixedContribution(
       projectionState.plusOnePercentLine = projectionStartValue;
       if (hasTrendGrowth) {
         projectionState.trendGrowthLine = projectionStartValue;
+        projectionState.trendGrowthWithPlannedContributionLine = projectionStartValue;
       }
     } else if (isFuturePoint) {
       // Continue projections for future months
@@ -223,6 +227,9 @@ export function calculateTargetWithFixedContribution(
       
       if (hasTrendGrowth) {
         lineWithTrendGrowth = projectionState.trendGrowthLine * (1 + monthlyTrendRate) + effectiveMinContribution;
+        const plannedContributionForTrend = contributesThisMonth ? plannedMonthlyContribution : 0;
+        lineWithTrendGrowthAndPlannedContribution =
+          projectionState.trendGrowthWithPlannedContributionLine * (1 + monthlyTrendRate) + plannedContributionForTrend;
       }
       
       // Update state for next iteration
@@ -231,6 +238,9 @@ export function calculateTargetWithFixedContribution(
       projectionState.plusOnePercentLine = lineWithPlusOnePercentGrowth;
       if (lineWithTrendGrowth !== null) {
         projectionState.trendGrowthLine = lineWithTrendGrowth;
+      }
+      if (lineWithTrendGrowthAndPlannedContribution !== null) {
+        projectionState.trendGrowthWithPlannedContributionLine = lineWithTrendGrowthAndPlannedContribution;
       }
     }
     
@@ -242,6 +252,7 @@ export function calculateTargetWithFixedContribution(
       projectionState.plusOnePercentLine = resetValue;
       if (hasTrendGrowth) {
         projectionState.trendGrowthLine = resetValue;
+        projectionState.trendGrowthWithPlannedContributionLine = resetValue;
       }
     }
     
@@ -324,6 +335,9 @@ export function calculateTargetWithFixedContribution(
       // Tooltip order: 1. 8% growth scenario, 2. Target with minimum contributions, 3. Calculated trend, 4. 6% growth scenario, 5. Current value, 6. Target with fixed contributions
       lineWithPlusOnePercentGrowth: lineWithPlusOnePercentGrowth ? Math.max(0, lineWithPlusOnePercentGrowth) : null,
       lineWithTrendGrowth: lineWithTrendGrowth ? Math.max(0, lineWithTrendGrowth) : null,
+      lineWithTrendGrowthAndPlannedContribution: lineWithTrendGrowthAndPlannedContribution
+        ? Math.max(0, lineWithTrendGrowthAndPlannedContribution)
+        : null,
       targetWithMinimumContribution: targetWithMinimumContribution ? Math.max(0, targetWithMinimumContribution) : null,
       plannedContributionLine: plannedContributionLine !== null ? Math.max(0, plannedContributionLine) : null,
       plannedMinRequiredContribution: plannedMinRequiredContribution !== null ? Math.max(0, plannedMinRequiredContribution) : null,
@@ -357,8 +371,8 @@ export function processStocksData(data: Event[]): ChartDataPoint[] {
 }
 
 /**
- * Calculate exponential trend line for EUNL data with confidence intervals
- * Returns both the enhanced data and trend statistics
+ * Calculate exponential trend line for index data with confidence intervals.
+ * Supports both `value` and legacy `price` fields.
  */
 export function calculateExponentialTrend(data: any[]): { data: any[], trendStats: { annualGrowthRate: number, standardDeviation: number } | null } {
   if (!data || data.length < 2) return { data, trendStats: null };
@@ -368,7 +382,7 @@ export function calculateExponentialTrend(data: any[]): { data: any[], trendStat
   const numericData = data.map((item) => ({
     ...item,
     x: (item.date.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24), // days since first date
-    y: item.price
+    y: item.value ?? item.price
   })).filter(item => item.y !== null);
 
   if (numericData.length < 2) return { data, trendStats: null };
@@ -408,17 +422,19 @@ export function calculateExponentialTrend(data: any[]): { data: any[], trendStat
     const confidenceInterval = standardDeviation * trend;
     const upperBound = trend + confidenceInterval;
     const lowerBound = Math.max(0, trend - confidenceInterval); // Don't go below 0 for prices
-    const multiplier = item.price ? trend / item.price : null;
+    const observedValue = item.value ?? item.price;
+    const multiplier = observedValue ? trend / observedValue : null;
     
     return {
       ...item,
+      value: observedValue,
       trend,
       trendUpperBound: upperBound,
       trendLowerBound: lowerBound,
       multiplier,
       // Add indicators for when price is outside confidence interval
-      isAboveUpperBound: item.price !== null && item.price > upperBound,
-      isBelowLowerBound: item.price !== null && item.price < lowerBound
+      isAboveUpperBound: observedValue !== null && observedValue > upperBound,
+      isBelowLowerBound: observedValue !== null && observedValue < lowerBound
     };
   });
 

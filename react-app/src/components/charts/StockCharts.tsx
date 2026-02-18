@@ -2,7 +2,7 @@ import React from 'react';
 import { ViewModeToggle } from './ViewModeToggle';
 import { StockChart } from './StockChart';
 import { MinRequiredContributionsChart } from './MinRequiredContributionsChart';
-import { EUNLChart } from './EUNLChart';
+import { IndexHistoryChartV2 } from './IndexHistoryChartV2';
 import { ConditionsTable } from './ConditionsTable';
 import { useFinancialCalculations } from '../../hooks/use-financial-calculations';
 import type { StockChartsProps } from '../../types';
@@ -15,13 +15,14 @@ export function StockCharts({
   data, 
   config, 
   conditions, 
-  eunlData, 
-  onFetchEUNL, 
+  indexDataBySymbol,
+  indexTrendStatsBySymbol,
+  onFetchIndexData,
   loading,
   viewMode,
   onViewModeChange,
-  eunlTrendStats,
-  eunlError
+  averageIndexTrendStats,
+  indexError
 }: StockChartsProps): React.JSX.Element {
 
   if (!data || data.length === 0) {
@@ -37,20 +38,18 @@ export function StockCharts({
   const {
     fullChartData,
     filteredData,
-    eunlChartData,
     milestoneMarkers
   } = useFinancialCalculations(
     data,
     config,
     conditions,
-    eunlData,
     viewMode,
-    eunlTrendStats?.annualGrowthRate
+    averageIndexTrendStats?.annualGrowthRate
   );
 
-  const handleFetchEUNL = async (): Promise<void> => {
-    if (onFetchEUNL) {
-      await onFetchEUNL();
+  const handleFetchIndexData = async (): Promise<void> => {
+    if (onFetchIndexData) {
+      await onFetchIndexData();
     }
   };
 
@@ -71,7 +70,7 @@ export function StockCharts({
           dataKey="stocks_in_eur"
           config={config}
           milestoneMarkers={milestoneMarkers}
-          trendAnnualGrowthRate={eunlTrendStats?.annualGrowthRate ?? null}
+          trendAnnualGrowthRate={averageIndexTrendStats?.annualGrowthRate ?? null}
           rawData={data}
         />
         
@@ -88,16 +87,16 @@ export function StockCharts({
           config={config}
         />
         
-        <EUNLChart 
-          title="EUNL ETF history" 
-          data={eunlChartData}
-          onFetchEUNL={handleFetchEUNL}
+        <IndexHistoryChartV2
+          title="Index history"
+          indexDataBySymbol={indexDataBySymbol}
+          indexTrendStatsBySymbol={indexTrendStatsBySymbol}
+          onFetchIndexData={handleFetchIndexData}
           loading={loading}
           showOnlyDataWithStocks={viewMode === 'recorded'}
           stocksData={filteredData}
           viewMode={viewMode}
-          trendStats={eunlTrendStats}
-          eunlError={eunlError}
+          indexError={indexError}
         />
       </div>
     </div>

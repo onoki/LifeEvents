@@ -56,7 +56,7 @@ export function generateAriaDescription(element: string): string {
     focusedSavings: 'Shows focused savings progress and time remaining until the planned contribution end date',
     retirement: 'Shows retirement progress and time remaining until retirement period ends',
     stockChart: 'Interactive chart showing stock value progression over time with target lines',
-    eunlChart: 'Interactive chart showing EUNL ETF price history with trend analysis',
+    eunlChart: 'Interactive chart showing index history with trend analysis',
     contributionsChart: 'Interactive chart showing minimum required monthly contributions to reach investment goals',
     conditionsTable: 'Table showing reward conditions and their descriptions',
     viewModeToggle: 'Toggle between different data view modes: recorded range, next 2 years, or full range',

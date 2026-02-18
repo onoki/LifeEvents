@@ -1,13 +1,13 @@
 # Life Events KPI Tracker
 
-Life Events KPI Tracker is a React + TypeScript web app for tracking life events and investment progress. It loads TSV data from a URL (for example, a published Google Sheets export), calculates KPIs, and renders charts for stock value, contribution plans, and EUNL trend analysis.
+Life Events KPI Tracker is a React + TypeScript web app for tracking life events and investment progress. It loads TSV data from a URL (for example, a published Google Sheets export), calculates KPIs, and renders charts for stock value, contribution plans, and index trend analysis.
 
 ## Features
 
 - KPI cards for work progress, focused savings, and retirement.
 - Stock value chart with target lines, growth scenarios, and reward milestones.
 - Minimum required contribution and planned contribution projections.
-- EUNL ETF history with trend and confidence bands (fetched on demand from Yahoo Finance via multiple CORS proxy fallbacks).
+- Multi-index history with trend and confidence bands (EUNL from Yahoo Finance plus Morningstar indexes).
 - Privacy mode via a URL parameter.
 
 ## Tech stack

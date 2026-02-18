@@ -42,6 +42,7 @@ export interface ChartDataPoint {
   lineWithMinusOnePercentGrowth?: number | null;
   lineWithPlusOnePercentGrowth?: number | null;
   lineWithTrendGrowth?: number | null;
+  lineWithTrendGrowthAndPlannedContribution?: number | null;
   plannedContributionLine?: number | null;
   plannedMinRequiredContribution?: number | null;
   expectedMinRequiredContribution?: number | null;
@@ -49,9 +50,14 @@ export interface ChartDataPoint {
   minRequiredContributionAdjustedForEUNLTrend?: number;
 }
 
-export interface EUNLDataPoint {
+export interface TrendStats {
+  annualGrowthRate: number;
+  standardDeviation: number;
+}
+
+export interface IndexDataPoint {
   date: Date;
-  price: number | null;
+  value: number | null;
   dateFormatted: string;
   trend?: number;
   trendUpperBound?: number;
@@ -59,6 +65,11 @@ export interface EUNLDataPoint {
   multiplier?: number | null;
   isAboveUpperBound?: boolean;
   isBelowLowerBound?: boolean;
+}
+
+// Backward-compatible aliases for legacy components.
+export interface EUNLDataPoint extends IndexDataPoint {
+  price?: number | null;
 }
 
 export interface MilestoneMarker {
@@ -80,13 +91,14 @@ export interface StockChartsProps {
   data: Event[];
   config: Config;
   conditions: Condition[];
-  eunlData: EUNLDataPoint[];
-  onFetchEUNL: () => Promise<void>;
+  indexDataBySymbol: Record<string, IndexDataPoint[]>;
+  indexTrendStatsBySymbol: Record<string, TrendStats | null>;
+  onFetchIndexData: () => Promise<void>;
   loading: boolean;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
-  eunlTrendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
-  eunlError?: string | null;
+  averageIndexTrendStats?: TrendStats | null;
+  indexError?: string | null;
 }
 
 export interface StockChartProps {
@@ -100,6 +112,19 @@ export interface StockChartProps {
   rawData?: Event[];
 }
 
+export interface IndexHistoryChartProps {
+  title: string;
+  indexDataBySymbol: Record<string, IndexDataPoint[]>;
+  indexTrendStatsBySymbol: Record<string, TrendStats | null>;
+  onFetchIndexData?: () => Promise<void>;
+  loading: boolean;
+  showOnlyDataWithStocks: boolean;
+  stocksData: Event[];
+  viewMode: ViewMode;
+  indexError?: string | null;
+}
+
+// Backward-compatible props for legacy EUNL chart wrapper.
 export interface EUNLChartProps {
   title: string;
   data: EUNLDataPoint[];
@@ -108,7 +133,7 @@ export interface EUNLChartProps {
   showOnlyDataWithStocks: boolean;
   stocksData: Event[];
   viewMode: ViewMode;
-  trendStats?: { annualGrowthRate: number, standardDeviation: number } | null;
+  trendStats?: TrendStats | null;
   eunlError?: string | null;
 }
 
@@ -145,9 +170,11 @@ export interface UseDataReturn {
   error: string | null;
   status: string;
   loadData: (url: string) => Promise<void>;
-  eunlData: EUNLDataPoint[];
-  fetchEUNLData: () => Promise<void>;
-  eunlError?: string | null;
+  indexDataBySymbol: Record<string, IndexDataPoint[]>;
+  indexTrendStatsBySymbol: Record<string, TrendStats | null>;
+  averageIndexTrendStats?: TrendStats | null;
+  fetchIndexData: () => Promise<void>;
+  indexError?: string | null;
 }
 
 // API response types
