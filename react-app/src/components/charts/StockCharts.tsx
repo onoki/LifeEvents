@@ -2,7 +2,7 @@ import React from 'react';
 import { ViewModeToggle } from './ViewModeToggle';
 import { StockChart } from './StockChart';
 import { MinRequiredContributionsChart } from './MinRequiredContributionsChart';
-import { IndexHistoryChartV2 } from './IndexHistoryChartV2';
+import { IndexHistoryChart } from './IndexHistoryChart';
 import { ConditionsTable } from './ConditionsTable';
 import { useFinancialCalculations } from '../../hooks/use-financial-calculations';
 import type { StockChartsProps } from '../../types';
@@ -87,7 +87,7 @@ export function StockCharts({
           config={config}
         />
         
-        <IndexHistoryChartV2
+        <IndexHistoryChart
           title="Index history"
           indexDataBySymbol={indexDataBySymbol}
           indexTrendStatsBySymbol={indexTrendStatsBySymbol}

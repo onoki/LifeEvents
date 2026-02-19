@@ -119,23 +119,21 @@ export const useAppStore = create<AppState>()(
 
         const existingIndexDataBySymbol = get().indexDataBySymbol;
         const existingIndexTrendStatsBySymbol = get().indexTrendStatsBySymbol;
+        // Refresh Morningstar-backed series on each fetch (token-sensitive),
+        // but only fetch Yahoo series when missing to reduce 429 rate limiting.
         const indexDefinitionsToFetch = APP_CONFIG.API.INDEX_SERIES.filter((indexDefinition) => {
+          if (indexDefinition.source === 'morningstar') {
+            return true;
+          }
+
           const existingSeries = existingIndexDataBySymbol[indexDefinition.symbol];
           return !Array.isArray(existingSeries) || existingSeries.length === 0;
         });
 
-        if (indexDefinitionsToFetch.length === 0) {
-          set({
-            indexError: null,
-            status: 'Index data already loaded',
-          });
-          return;
-        }
-
         set({
           loading: true,
           indexError: null,
-          status: `Fetching ${indexDefinitionsToFetch.length} missing index series...`,
+          status: `Fetching ${indexDefinitionsToFetch.length} index series...`,
         });
 
         try {
@@ -165,6 +163,13 @@ export const useAppStore = create<AppState>()(
             const normalizedPath = pathWithQuery.startsWith('/') ? pathWithQuery : `/${pathWithQuery}`;
             return new URL(normalizedPath, window.location.origin).toString();
           };
+
+          const isLocalDevHost = (): boolean => {
+            const host = window.location.hostname;
+            return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+          };
+
+          const useSameOriginProxy = isLocalDevHost();
 
           const toPathAndQuery = (url: string): string => {
             const parsed = new URL(url);
@@ -414,14 +419,14 @@ export const useAppStore = create<AppState>()(
             const authUrl = new URL(APP_CONFIG.API.MORNINGSTAR.AUTH_PAGE_URL);
             authUrl.searchParams.set('_ts', Date.now().toString());
             const authUrlString = authUrl.toString();
-            const morningstarAuthSameOriginUrl = buildSameOriginUrl(
-              `/proxy-morningstar-indexes${toPathAndQuery(authUrlString)}`
-            );
+            const morningstarAuthSameOriginUrl = useSameOriginProxy
+              ? buildSameOriginUrl(`/proxy-morningstar-indexes${toPathAndQuery(authUrlString)}`)
+              : undefined;
             const { data: html } = await fetchTextWithFallback({
               targetUrl: authUrlString,
               sameOriginUrl: morningstarAuthSameOriginUrl,
               includeDirect: false,
-              includeExternalProxies: false,
+              includeExternalProxies: !useSameOriginProxy,
               requestInit: {
                 cache: 'no-store',
                 headers: {
@@ -439,7 +444,9 @@ export const useAppStore = create<AppState>()(
 
           const fetchYahooIndex = async (indexDefinition: IndexDefinition): Promise<{ points: IndexDataPoint[]; sourceName: string }> => {
             const yahooUrl = `${APP_CONFIG.API.YAHOO_FINANCE_BASE}/${indexDefinition.symbol}?period1=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.START}&period2=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.END}&interval=1mo`;
-            const yahooSameOriginUrl = buildSameOriginUrl(`/proxy-yahoo${toPathAndQuery(yahooUrl)}`);
+            const yahooSameOriginUrl = useSameOriginProxy
+              ? buildSameOriginUrl(`/proxy-yahoo${toPathAndQuery(yahooUrl)}`)
+              : undefined;
             const { data, sourceName } = await fetchJsonWithFallback<YahooChartResponse>({
               targetUrl: yahooUrl,
               sameOriginUrl: yahooSameOriginUrl,
@@ -473,7 +480,9 @@ export const useAppStore = create<AppState>()(
             }
 
             const morningstarUrl = buildMorningstarUrl(queryKey);
-            const morningstarSameOriginUrl = buildSameOriginUrl(`/proxy-morningstar-api${toPathAndQuery(morningstarUrl)}`);
+            const morningstarSameOriginUrl = useSameOriginProxy
+              ? buildSameOriginUrl(`/proxy-morningstar-api${toPathAndQuery(morningstarUrl)}`)
+              : undefined;
             const { data, sourceName } = await fetchJsonWithFallback<MorningstarResponse>({
               targetUrl: morningstarUrl,
               sameOriginUrl: morningstarSameOriginUrl,
@@ -483,7 +492,7 @@ export const useAppStore = create<AppState>()(
                 'X-Api-RequestId': buildRequestId(),
               },
               includeDirect: false,
-              includeExternalProxies: false,
+              includeExternalProxies: !useSameOriginProxy,
               requestInit: {
                 cache: 'no-store',
               },
@@ -602,8 +611,8 @@ export const useAppStore = create<AppState>()(
               : null,
             status: hasAnyData
               ? (missingSymbols.length === 0
-                  ? `Loaded ${newlyLoadedCount} missing index series`
-                  : `Loaded ${newlyLoadedCount} missing index series. Still missing: ${missingSymbols.join(', ')}`)
+                  ? `Loaded ${newlyLoadedCount} index series`
+                  : `Loaded ${newlyLoadedCount} index series. Still missing: ${missingSymbols.join(', ')}`)
               : 'Error loading index data',
           });
           

@@ -67,11 +67,6 @@ export interface IndexDataPoint {
   isBelowLowerBound?: boolean;
 }
 
-// Backward-compatible aliases for legacy components.
-export interface EUNLDataPoint extends IndexDataPoint {
-  price?: number | null;
-}
-
 export interface MilestoneMarker {
   x: string;
   y: number;
@@ -122,19 +117,6 @@ export interface IndexHistoryChartProps {
   stocksData: Event[];
   viewMode: ViewMode;
   indexError?: string | null;
-}
-
-// Backward-compatible props for legacy EUNL chart wrapper.
-export interface EUNLChartProps {
-  title: string;
-  data: EUNLDataPoint[];
-  onFetchEUNL?: () => Promise<void>;
-  loading: boolean;
-  showOnlyDataWithStocks: boolean;
-  stocksData: Event[];
-  viewMode: ViewMode;
-  trendStats?: TrendStats | null;
-  eunlError?: string | null;
 }
 
 export interface MinRequiredContributionsChartProps {

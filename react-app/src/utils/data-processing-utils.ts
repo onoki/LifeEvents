@@ -219,8 +219,21 @@ export function filterDataByViewMode(
   viewMode: ViewMode
 ): Event[] {
   if (viewMode === 'recorded') {
-    // Show only months with stock data
-    return data.filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
+    // Show recorded range with a one-month lead-in so the first recorded point
+    // is not pinned to the left edge of charts.
+    const stocksData = data.filter((item) => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
+    if (stocksData.length === 0) {
+      return [];
+    }
+
+    const minDate = new Date(Math.min(...stocksData.map((item) => new Date(item.date).getTime())));
+    const maxDate = new Date(Math.max(...stocksData.map((item) => new Date(item.date).getTime())));
+    const rangeStart = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
+
+    return data.filter((item) => {
+      const itemDate = new Date(item.date);
+      return itemDate >= rangeStart && itemDate <= maxDate;
+    });
   } else if (viewMode === 'next2years' || viewMode === 'next5years') {
     // Show recorded data + next years (limit to exactly N years after last stock data)
     const stocksData = data.filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
