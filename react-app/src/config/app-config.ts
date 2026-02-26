@@ -30,9 +30,11 @@ export const APP_CONFIG = {
     EUNL_SYMBOL: 'EUNL.DE',
     // Keep multiple CORS proxies so one outage does not break index fetching.
     CORS_PROXIES: [
-      'https://corsproxy.io/?',
+      // codetabs requires `/proxy/` (trailing slash). Without it, browsers hit a 301
+      // on preflight and reject the redirected CORS request.
+      'https://api.codetabs.com/v1/proxy/?quest=',
       'https://api.allorigins.win/raw?url=',
-      'https://api.codetabs.com/v1/proxy?quest=',
+      'https://corsproxy.io/?',
     ],
     REQUEST_TIMEOUT_MS: 15000,
     YAHOO_FINANCE_PERIODS: {

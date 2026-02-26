@@ -249,7 +249,7 @@ export function IndexHistoryChart({
         variant: 'note' as const,
       },
       {
-        label: 'Trend / +/-1 sigma',
+        label: 'Trend / +/-1 σ',
         description: 'Dashed lines show trend and one standard deviation band per index.',
         variant: 'note' as const,
       },
@@ -419,7 +419,7 @@ export function IndexHistoryChart({
                               <span className="text-right">{formatValue(value)}</span>
                               <span className="text-muted-foreground">Trend:</span>
                               <span className="text-right">{typeof trend === 'number' ? formatValue(trend) : 'N/A'}</span>
-                              <span className="text-muted-foreground">+1 sigma / -1 sigma:</span>
+                              <span className="text-muted-foreground">+1 σ / -1 σ:</span>
                               <span className="text-right">
                                 {typeof upper === 'number' && typeof lower === 'number'
                                   ? `${formatValue(upper)} / ${formatValue(lower)}`
@@ -518,7 +518,7 @@ export function IndexHistoryChart({
                 (
                 <span className="font-semibold text-foreground">
                   {typeof sigmasFromTrend === 'number' && Number.isFinite(sigmasFromTrend)
-                    ? `${sigmasFromTrend >= 0 ? '+' : ''}${sigmasFromTrend.toFixed(2)} sigma`
+                    ? `${sigmasFromTrend >= 0 ? '+' : ''}${sigmasFromTrend.toFixed(2)} σ`
                     : 'N/A'}
                 </span>
                 )

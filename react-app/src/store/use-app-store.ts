@@ -164,12 +164,11 @@ export const useAppStore = create<AppState>()(
             return new URL(normalizedPath, window.location.origin).toString();
           };
 
-          const isLocalDevHost = (): boolean => {
-            const host = window.location.hostname;
-            return host === 'localhost' || host === '127.0.0.1' || host === '::1';
-          };
-
-          const useSameOriginProxy = isLocalDevHost();
+          // Default to production-like networking even in dev so GitHub Pages behavior
+          // can be validated locally. Opt in to Vite same-origin proxies only when
+          // VITE_USE_DEV_SAME_ORIGIN_PROXY=true.
+          const useSameOriginProxy = import.meta.env.DEV
+            && import.meta.env.VITE_USE_DEV_SAME_ORIGIN_PROXY === 'true';
 
           const toPathAndQuery = (url: string): string => {
             const parsed = new URL(url);
@@ -429,10 +428,6 @@ export const useAppStore = create<AppState>()(
               includeExternalProxies: !useSameOriginProxy,
               requestInit: {
                 cache: 'no-store',
-                headers: {
-                  'Cache-Control': 'no-cache',
-                  Pragma: 'no-cache',
-                },
               },
             });
             const token = extractMorningstarToken(html);
@@ -472,7 +467,7 @@ export const useAppStore = create<AppState>()(
 
           const fetchMorningstarIndex = async (
             indexDefinition: IndexDefinition,
-            token: string
+            token?: string
           ): Promise<{ points: IndexDataPoint[]; sourceName: string }> => {
             const queryKey = 'queryKey' in indexDefinition ? indexDefinition.queryKey : undefined;
             if (!queryKey) {
@@ -486,11 +481,15 @@ export const useAppStore = create<AppState>()(
             const { data, sourceName } = await fetchJsonWithFallback<MorningstarResponse>({
               targetUrl: morningstarUrl,
               sameOriginUrl: morningstarSameOriginUrl,
-              headers: {
-                'Accept': 'application/json,text/plain,*/*',
-                'Authorization': `Bearer ${token}`,
-                'X-Api-RequestId': buildRequestId(),
-              },
+              headers: token
+                ? {
+                    'Accept': 'application/json,text/plain,*/*',
+                    'Authorization': `Bearer ${token}`,
+                    'X-Api-RequestId': buildRequestId(),
+                  }
+                : {
+                    'Accept': 'application/json,text/plain,*/*',
+                  },
               includeDirect: false,
               includeExternalProxies: !useSameOriginProxy,
               requestInit: {
@@ -551,21 +550,24 @@ export const useAppStore = create<AppState>()(
                 sourceName = result.sourceName;
               } else {
                 if (!morningstarToken) {
-                  throw new Error('Morningstar token missing');
-                }
-                try {
-                  const result = await fetchMorningstarIndex(indexDefinition, morningstarToken);
+                  const result = await fetchMorningstarIndex(indexDefinition);
                   points = result.points;
-                  sourceName = result.sourceName;
-                } catch (morningstarError) {
-                  const errorMessage = morningstarError instanceof Error ? morningstarError.message : '';
-                  if (errorMessage.includes('HTTP 401')) {
-                    morningstarToken = await fetchMorningstarToken();
-                    const retryResult = await fetchMorningstarIndex(indexDefinition, morningstarToken);
-                    points = retryResult.points;
-                    sourceName = `${retryResult.sourceName} (token-refresh)`;
-                  } else {
-                    throw morningstarError;
+                  sourceName = `${result.sourceName} (no-token)`;
+                } else {
+                  try {
+                    const result = await fetchMorningstarIndex(indexDefinition, morningstarToken);
+                    points = result.points;
+                    sourceName = result.sourceName;
+                  } catch (morningstarError) {
+                    const errorMessage = morningstarError instanceof Error ? morningstarError.message : '';
+                    if (errorMessage.includes('HTTP 401')) {
+                      morningstarToken = await fetchMorningstarToken();
+                      const retryResult = await fetchMorningstarIndex(indexDefinition, morningstarToken);
+                      points = retryResult.points;
+                      sourceName = `${retryResult.sourceName} (token-refresh)`;
+                    } else {
+                      throw morningstarError;
+                    }
                   }
                 }
               }
