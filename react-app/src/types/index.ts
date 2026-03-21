@@ -88,7 +88,7 @@ export interface StockChartsProps {
   conditions: Condition[];
   indexDataBySymbol: Record<string, IndexDataPoint[]>;
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
-  onFetchIndexData: () => Promise<void>;
+  onFetchIndexData: (symbol?: string) => Promise<void>;
   loading: boolean;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
@@ -111,7 +111,7 @@ export interface IndexHistoryChartProps {
   title: string;
   indexDataBySymbol: Record<string, IndexDataPoint[]>;
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
-  onFetchIndexData?: () => Promise<void>;
+  onFetchIndexData?: (symbol?: string) => Promise<void>;
   loading: boolean;
   showOnlyDataWithStocks: boolean;
   stocksData: Event[];
@@ -155,7 +155,7 @@ export interface UseDataReturn {
   indexDataBySymbol: Record<string, IndexDataPoint[]>;
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
   averageIndexTrendStats?: TrendStats | null;
-  fetchIndexData: () => Promise<void>;
+  fetchIndexData: (symbol?: string) => Promise<void>;
   indexError?: string | null;
 }
 

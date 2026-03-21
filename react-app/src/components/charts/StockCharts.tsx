@@ -47,9 +47,9 @@ export function StockCharts({
     averageIndexTrendStats?.annualGrowthRate
   );
 
-  const handleFetchIndexData = async (): Promise<void> => {
+  const handleFetchIndexData = async (symbol?: string): Promise<void> => {
     if (onFetchIndexData) {
-      await onFetchIndexData();
+      await onFetchIndexData(symbol);
     }
   };
 

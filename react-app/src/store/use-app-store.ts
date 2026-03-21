@@ -35,7 +35,7 @@ interface AppState {
   
   // Complex actions
   loadData: (url: string) => Promise<void>;
-  fetchIndexData: () => Promise<void>;
+  fetchIndexData: (symbol?: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -113,22 +113,26 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      fetchIndexData: async () => {
+      fetchIndexData: async (symbol?: string) => {
         const { APP_CONFIG } = await import('../config/app-config');
         const { calculateExponentialTrend } = await import('../utils/financial-utils');
 
         const existingIndexDataBySymbol = get().indexDataBySymbol;
         const existingIndexTrendStatsBySymbol = get().indexTrendStatsBySymbol;
-        // Refresh Morningstar-backed series on each fetch (token-sensitive),
-        // but only fetch Yahoo series when missing to reduce 429 rate limiting.
+        const requestedSymbolSet = symbol ? new Set([symbol]) : null;
         const indexDefinitionsToFetch = APP_CONFIG.API.INDEX_SERIES.filter((indexDefinition) => {
-          if (indexDefinition.source === 'morningstar') {
-            return true;
-          }
-
-          const existingSeries = existingIndexDataBySymbol[indexDefinition.symbol];
-          return !Array.isArray(existingSeries) || existingSeries.length === 0;
+          return requestedSymbolSet === null || requestedSymbolSet.has(indexDefinition.symbol);
         });
+        const fetchScopeSymbols = indexDefinitionsToFetch.map((series) => series.symbol);
+
+        if (indexDefinitionsToFetch.length === 0) {
+          set({
+            loading: false,
+            indexError: `Unknown index symbol: ${symbol}`,
+            status: 'Error loading index data',
+          });
+          return;
+        }
 
         set({
           loading: true,
@@ -142,6 +146,11 @@ export const useAppStore = create<AppState>()(
             chart?: {
               result?: Array<{
                 timestamp?: number[];
+                meta?: {
+                  gmtoffset?: number;
+                  exchangeTimezoneName?: string;
+                  timezone?: string;
+                };
                 indicators?: {
                   quote?: Array<{
                     close?: Array<number | null>;
@@ -438,29 +447,194 @@ export const useAppStore = create<AppState>()(
           };
 
           const fetchYahooIndex = async (indexDefinition: IndexDefinition): Promise<{ points: IndexDataPoint[]; sourceName: string }> => {
-            const yahooUrl = `${APP_CONFIG.API.YAHOO_FINANCE_BASE}/${indexDefinition.symbol}?period1=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.START}&period2=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.END}&interval=1mo`;
-            const yahooSameOriginUrl = useSameOriginProxy
-              ? buildSameOriginUrl(`/proxy-yahoo${toPathAndQuery(yahooUrl)}`)
-              : undefined;
-            const { data, sourceName } = await fetchJsonWithFallback<YahooChartResponse>({
-              targetUrl: yahooUrl,
-              sameOriginUrl: yahooSameOriginUrl,
-              includeDirect: false,
-              includeExternalProxies: true,
-            });
-            const result = data.chart?.result?.[0];
-            const timestamps = result?.timestamp;
-            const closePrices = result?.indicators?.quote?.[0]?.close;
+            const getTodayStartForOffset = (offsetSeconds: number): Date => {
+              const shiftedNow = new Date(Date.now() + (offsetSeconds * 1000));
+              return new Date(Date.UTC(
+                shiftedNow.getUTCFullYear(),
+                shiftedNow.getUTCMonth(),
+                shiftedNow.getUTCDate()
+              ));
+            };
 
-            if (!timestamps || !closePrices) {
-              throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
+            const parseYahooPoints = (
+              response: YahooChartResponse
+            ): {
+              points: IndexDataPoint[];
+              gmtoffsetSeconds: number;
+            } => {
+              const result = response.chart?.result?.[0];
+              const timestamps = result?.timestamp;
+              const closePrices = result?.indicators?.quote?.[0]?.close;
+              const gmtoffsetSeconds = typeof result?.meta?.gmtoffset === 'number' && Number.isFinite(result.meta.gmtoffset)
+                ? result.meta.gmtoffset
+                : 0;
+
+              if (!timestamps || !closePrices) {
+                throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
+              }
+
+              const points = timestamps
+                .map((timestamp: number, index: number): IndexDataPoint | null => {
+                  const value = closePrices[index];
+                  if (typeof value !== 'number' || !Number.isFinite(value)) {
+                    return null;
+                  }
+
+                  // Use Yahoo's market timezone offset to map each timestamp
+                  // to the correct market-local calendar day.
+                  const sourceDate = new Date((timestamp + gmtoffsetSeconds) * 1000);
+                  if (Number.isNaN(sourceDate.getTime())) {
+                    return null;
+                  }
+
+                  const parsedDate = new Date(Date.UTC(
+                    sourceDate.getUTCFullYear(),
+                    sourceDate.getUTCMonth(),
+                    sourceDate.getUTCDate()
+                  ));
+                  if (Number.isNaN(parsedDate.getTime())) {
+                    return null;
+                  }
+
+                  return {
+                    date: parsedDate,
+                    value,
+                    dateFormatted: parsedDate.toLocaleDateString('en-US', {
+                      ...APP_CONFIG.DATA.DATE_FORMAT_OPTIONS_WITH_DAY,
+                      timeZone: 'UTC',
+                    }),
+                  };
+                })
+                .filter((item): item is IndexDataPoint => item !== null);
+
+              return {
+                points,
+                gmtoffsetSeconds,
+              };
+            };
+
+            const fetchYahooByUrl = async (
+              yahooUrl: string
+            ): Promise<{
+              points: IndexDataPoint[];
+              sourceName: string;
+              gmtoffsetSeconds: number;
+            }> => {
+              const yahooUrlWithNoCache = new URL(yahooUrl);
+              yahooUrlWithNoCache.searchParams.set('_ts', `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+              const targetYahooUrl = yahooUrlWithNoCache.toString();
+              const yahooSameOriginUrl = useSameOriginProxy
+                ? buildSameOriginUrl(`/proxy-yahoo${toPathAndQuery(targetYahooUrl)}`)
+                : undefined;
+              const { data, sourceName } = await fetchJsonWithFallback<YahooChartResponse>({
+                targetUrl: targetYahooUrl,
+                sameOriginUrl: yahooSameOriginUrl,
+                includeDirect: false,
+                includeExternalProxies: true,
+                requestInit: {
+                  cache: 'no-store',
+                },
+              });
+              const parsed = parseYahooPoints(data);
+
+              return {
+                points: parsed.points,
+                sourceName,
+                gmtoffsetSeconds: parsed.gmtoffsetSeconds,
+              };
+            };
+
+            const monthlyUrl = `${APP_CONFIG.API.YAHOO_FINANCE_BASE}/${indexDefinition.symbol}?period1=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.START}&period2=${APP_CONFIG.API.YAHOO_FINANCE_PERIODS.END}&interval=1mo`;
+            const monthlyResult = await fetchYahooByUrl(monthlyUrl);
+            const todayStartMonthlyTz = getTodayStartForOffset(monthlyResult.gmtoffsetSeconds);
+            const monthlyLatestPoint = monthlyResult.points
+              .slice()
+              .sort((left, right) => left.date.getTime() - right.date.getTime())
+              .pop();
+            const monthlyLatestSelectablePoint = monthlyResult.points
+              .filter((point) => point.date.getTime() < todayStartMonthlyTz.getTime())
+              .sort((left, right) => left.date.getTime() - right.date.getTime())
+              .pop();
+
+            const toYearMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
+            let points = monthlyResult.points;
+            let sourceName = monthlyResult.sourceName;
+
+            // Keep month-by-month history, but replace the latest month bucket
+            // with the latest available daily close (typically yesterday).
+            const now = new Date();
+            const nowUnix = Math.floor(now.getTime() / 1000);
+            const twoDaysInSeconds = 2 * 24 * 60 * 60;
+            const sevenDaysInSeconds = 7 * 24 * 60 * 60;
+            const currentMonthStartUnix = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) / 1000);
+            const dailyUrls = [
+              `${APP_CONFIG.API.YAHOO_FINANCE_BASE}/${indexDefinition.symbol}?range=3mo&interval=1d`,
+              `${APP_CONFIG.API.YAHOO_FINANCE_BASE}/${indexDefinition.symbol}?range=1mo&interval=1d`,
+              `${APP_CONFIG.API.YAHOO_FINANCE_BASE}/${indexDefinition.symbol}?period1=${currentMonthStartUnix - sevenDaysInSeconds}&period2=${nowUnix + twoDaysInSeconds}&interval=1d`,
+            ];
+            const dailyErrors: string[] = [];
+            let dailyResult: {
+              points: IndexDataPoint[];
+              sourceName: string;
+              gmtoffsetSeconds: number;
+            } | null = null;
+
+            for (const dailyUrl of dailyUrls) {
+              try {
+                const candidate = await fetchYahooByUrl(dailyUrl);
+                if (candidate.points.length > 0) {
+                  dailyResult = candidate;
+                  break;
+                }
+                dailyErrors.push(`empty: ${dailyUrl}`);
+              } catch (dailyError) {
+                const errorMessage = dailyError instanceof Error ? dailyError.message : APP_CONFIG.ERRORS.FETCH_FAILED;
+                dailyErrors.push(errorMessage);
+              }
             }
 
-            const points = timestamps.map((timestamp: number, index: number) => ({
-              date: new Date(timestamp * 1000),
-              value: closePrices[index] ?? null,
-              dateFormatted: new Date(timestamp * 1000).toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS_WITH_DAY),
-            })).filter((item) => item.value !== null);
+            if (dailyResult) {
+              const todayStartDailyTz = getTodayStartForOffset(dailyResult.gmtoffsetSeconds);
+              const currentMonthKey = `${todayStartDailyTz.getUTCFullYear()}-${todayStartDailyTz.getUTCMonth()}`;
+              const dailyCurrentMonthPoints = dailyResult.points
+                .filter((point) => point.date.getTime() < todayStartDailyTz.getTime() && toYearMonthKey(point.date) === currentMonthKey)
+                .sort((left, right) => left.date.getTime() - right.date.getTime());
+              const firstDailyCurrentMonthPoint = dailyCurrentMonthPoints[0];
+              const latestDailyCurrentMonthPoint = dailyCurrentMonthPoints[dailyCurrentMonthPoints.length - 1];
+
+              if (firstDailyCurrentMonthPoint && latestDailyCurrentMonthPoint) {
+                const replacementPoints: IndexDataPoint[] = [firstDailyCurrentMonthPoint];
+                if (latestDailyCurrentMonthPoint.date.getTime() !== firstDailyCurrentMonthPoint.date.getTime()) {
+                  replacementPoints.push(latestDailyCurrentMonthPoint);
+                }
+
+                points = [
+                  ...monthlyResult.points.filter((point) => toYearMonthKey(point.date) !== currentMonthKey),
+                  ...replacementPoints,
+                ].sort((left, right) => left.date.getTime() - right.date.getTime());
+                sourceName = `${monthlyResult.sourceName} + ${dailyResult.sourceName}`;
+              } else {
+                const latestDailyPoint = dailyResult.points
+                  .filter((point) => point.date.getTime() < todayStartDailyTz.getTime())
+                  .sort((left, right) => left.date.getTime() - right.date.getTime())
+                  .pop();
+                const latestMonthlyComparablePoint = monthlyLatestSelectablePoint ?? monthlyLatestPoint;
+
+                if (
+                  latestDailyPoint
+                  && (!latestMonthlyComparablePoint || latestDailyPoint.date.getTime() > latestMonthlyComparablePoint.date.getTime())
+                ) {
+                  const latestDailyPointMonthKey = toYearMonthKey(latestDailyPoint.date);
+                  points = [
+                    ...monthlyResult.points.filter((point) => toYearMonthKey(point.date) !== latestDailyPointMonthKey),
+                    latestDailyPoint,
+                  ].sort((left, right) => left.date.getTime() - right.date.getTime());
+                  sourceName = `${monthlyResult.sourceName} + ${dailyResult.sourceName}`;
+                }
+              }
+            } else if (dailyErrors.length > 0) {
+              console.warn(`Daily Yahoo fetch failed for ${indexDefinition.symbol}, using monthly series only.`, dailyErrors.join(' | '));
+            }
 
             return { points, sourceName };
           };
@@ -502,16 +676,38 @@ export const useAppStore = create<AppState>()(
               throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
             }
 
-            const points = series.map((item) => {
-              const parsedDate = item.date ? new Date(item.date) : null;
-              return {
-                date: parsedDate ?? new Date('1970-01-01'),
-                value: item.close ?? null,
-                dateFormatted: parsedDate
-                  ? parsedDate.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS_WITH_DAY)
-                  : '',
-              };
-            }).filter((item) => item.value !== null && !Number.isNaN(item.date.getTime()));
+            const points = series
+              .map((item): IndexDataPoint | null => {
+                const sourceDate = item.date ? new Date(item.date) : null;
+                const value = item.close;
+
+                if (!sourceDate || Number.isNaN(sourceDate.getTime())) {
+                  return null;
+                }
+
+                if (typeof value !== 'number' || !Number.isFinite(value)) {
+                  return null;
+                }
+
+                const parsedDate = new Date(Date.UTC(
+                  sourceDate.getUTCFullYear(),
+                  sourceDate.getUTCMonth(),
+                  sourceDate.getUTCDate()
+                ));
+                if (Number.isNaN(parsedDate.getTime())) {
+                  return null;
+                }
+
+                return {
+                  date: parsedDate,
+                  value,
+                  dateFormatted: parsedDate.toLocaleDateString('en-US', {
+                    ...APP_CONFIG.DATA.DATE_FORMAT_OPTIONS_WITH_DAY,
+                    timeZone: 'UTC',
+                  }),
+                };
+              })
+              .filter((item): item is IndexDataPoint => item !== null);
 
             return { points, sourceName };
           };
@@ -524,6 +720,39 @@ export const useAppStore = create<AppState>()(
           };
           const loadErrors: string[] = [];
           let newlyLoadedCount = 0;
+
+          const publishIndexDataProgress = (statusOverride?: string): void => {
+            const loadedSymbols = fetchScopeSymbols
+              .filter((symbol) => {
+                const points = nextIndexDataBySymbol[symbol];
+                return Array.isArray(points) && points.length > 0;
+              });
+            const missingSymbols = fetchScopeSymbols.filter((targetSymbol) => !loadedSymbols.includes(targetSymbol));
+            const availableTrendStats = Object.values(nextIndexTrendStatsBySymbol).filter(
+              (stats): stats is TrendStats => stats !== null
+            );
+            const averageIndexTrendStats = availableTrendStats.length > 0
+              ? {
+                  annualGrowthRate: availableTrendStats.reduce((sum, stats) => sum + stats.annualGrowthRate, 0) / availableTrendStats.length,
+                  standardDeviation: availableTrendStats.reduce((sum, stats) => sum + stats.standardDeviation, 0) / availableTrendStats.length,
+                }
+              : null;
+            const hasAnyData = loadedSymbols.length > 0;
+
+            set({
+              indexDataBySymbol: { ...nextIndexDataBySymbol },
+              indexTrendStatsBySymbol: { ...nextIndexTrendStatsBySymbol },
+              averageIndexTrendStats,
+              indexError: loadErrors.length > 0
+                ? `Some index sources failed. ${loadErrors.join(' | ')}`
+                : null,
+              status: statusOverride ?? (hasAnyData
+                ? (missingSymbols.length === 0
+                    ? `Loaded ${newlyLoadedCount} index series`
+                    : `Loaded ${newlyLoadedCount} index series. Still missing: ${missingSymbols.join(', ')}`)
+                : 'Error loading index data'),
+            });
+          };
 
           let morningstarToken: string | null = null;
           const morningstarNeeded = indexDefinitionsToFetch.some((indexDefinition) => indexDefinition.source === 'morningstar');
@@ -576,47 +805,15 @@ export const useAppStore = create<AppState>()(
               nextIndexDataBySymbol[indexDefinition.symbol] = dataWithTrend as IndexDataPoint[];
               nextIndexTrendStatsBySymbol[indexDefinition.symbol] = trendStats;
               newlyLoadedCount += 1;
-              set({ status: `Loaded ${indexDefinition.symbol} (${points.length} points) via ${sourceName}` });
+              publishIndexDataProgress(`Loaded ${indexDefinition.symbol} (${points.length} points) via ${sourceName}`);
             } catch (err) {
               const errorMessage = err instanceof Error ? err.message : APP_CONFIG.ERRORS.FETCH_FAILED;
               loadErrors.push(`${indexDefinition.symbol}: ${errorMessage}`);
               console.error(`Failed to load index data for ${indexDefinition.symbol}:`, err);
+              publishIndexDataProgress(`Failed ${indexDefinition.symbol}; continuing...`);
             }
           }
-
-          const loadedSymbols = APP_CONFIG.API.INDEX_SERIES
-            .map((series) => series.symbol)
-            .filter((symbol) => {
-              const points = nextIndexDataBySymbol[symbol];
-              return Array.isArray(points) && points.length > 0;
-            });
-          const missingSymbols = APP_CONFIG.API.INDEX_SERIES
-            .map((series) => series.symbol)
-            .filter((symbol) => !loadedSymbols.includes(symbol));
-          const availableTrendStats = Object.values(nextIndexTrendStatsBySymbol).filter(
-            (stats): stats is TrendStats => stats !== null
-          );
-          const averageIndexTrendStats = availableTrendStats.length > 0
-            ? {
-                annualGrowthRate: availableTrendStats.reduce((sum, stats) => sum + stats.annualGrowthRate, 0) / availableTrendStats.length,
-                standardDeviation: availableTrendStats.reduce((sum, stats) => sum + stats.standardDeviation, 0) / availableTrendStats.length,
-              }
-            : null;
-          const hasAnyData = loadedSymbols.length > 0;
-
-          set({
-            indexDataBySymbol: nextIndexDataBySymbol,
-            indexTrendStatsBySymbol: nextIndexTrendStatsBySymbol,
-            averageIndexTrendStats,
-            indexError: loadErrors.length > 0
-              ? `Some index sources failed. ${loadErrors.join(' | ')}`
-              : null,
-            status: hasAnyData
-              ? (missingSymbols.length === 0
-                  ? `Loaded ${newlyLoadedCount} index series`
-                  : `Loaded ${newlyLoadedCount} index series. Still missing: ${missingSymbols.join(', ')}`)
-              : 'Error loading index data',
-          });
+          publishIndexDataProgress();
           
         } finally {
           set({ loading: false });

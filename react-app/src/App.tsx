@@ -51,8 +51,8 @@ function App(): React.JSX.Element {
   }
 
 
-  const handleFetchIndexData = async (): Promise<void> => {
-    await fetchIndexData()
+  const handleFetchIndexData = async (symbol?: string): Promise<void> => {
+    await fetchIndexData(symbol)
   }
 
   return (

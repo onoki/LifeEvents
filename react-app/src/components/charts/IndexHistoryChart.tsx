@@ -6,6 +6,7 @@ import { ChartLegend } from './ChartLegend';
 
 type ChartRow = {
   date: Date;
+  dateTs: number;
   dateFormatted: string;
   [key: string]: string | number | Date | null | undefined;
 };
@@ -37,6 +38,39 @@ const toDateKey = (date: Date): string => {
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const formatDateWithDayUtc = (date: Date): string => {
+  return toDateKey(date);
+};
+
+const formatLabelDateShort = (label: unknown): string => {
+  if (typeof label === 'number' && Number.isFinite(label)) {
+    return toDateKey(new Date(label));
+  }
+
+  if (label instanceof Date && !Number.isNaN(label.getTime())) {
+    return toDateKey(label);
+  }
+
+  if (typeof label === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
+      return label;
+    }
+    const parsed = new Date(label);
+    if (!Number.isNaN(parsed.getTime())) {
+      return toDateKey(parsed);
+    }
+    return label;
+  }
+
+  return '';
+};
+
+const getTodayStartLocal = (): Date => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
 };
 
 const toFieldPrefix = (symbol: string): string => symbol.replace(/[^a-zA-Z0-9]/g, '_');
@@ -76,6 +110,8 @@ const normalizeValue = (value: number | null | undefined, bounds: IndexBounds | 
   if (!Number.isFinite(normalized)) return null;
   return Math.max(0, Math.min(100, normalized));
 };
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 export function IndexHistoryChart({
   title,
@@ -172,15 +208,20 @@ export function IndexHistoryChart({
 
   const chartData = React.useMemo((): ChartRow[] => {
     const rowsByDate = new Map<string, ChartRow>();
+    const todayStartLocal = getTodayStartLocal();
 
     for (const config of seriesConfigs) {
       const points = filteredDataBySymbol[config.symbol] ?? [];
       points.forEach((point) => {
         const date = new Date(point.date);
+        if (Number.isNaN(date.getTime()) || !isFiniteNumber(point.value)) {
+          return;
+        }
         const dateKey = toDateKey(date);
         const existing = rowsByDate.get(dateKey) ?? {
           date,
-          dateFormatted: date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS_WITH_DAY),
+          dateTs: date.getTime(),
+          dateFormatted: formatDateWithDayUtc(date),
         };
 
         const bounds = boundsBySymbol[config.symbol] ?? null;
@@ -200,7 +241,12 @@ export function IndexHistoryChart({
       });
     }
 
-    return Array.from(rowsByDate.values()).sort((a, b) => (a.date as Date).getTime() - (b.date as Date).getTime());
+    return Array.from(rowsByDate.values())
+      .sort((a, b) => (a.dateTs as number) - (b.dateTs as number))
+      .filter((row) => {
+        return seriesConfigs.some((config) => isFiniteNumber(row[config.valueKey]))
+          && (row.dateTs as number) < todayStartLocal.getTime();
+      });
   }, [boundsBySymbol, filteredDataBySymbol, seriesConfigs]);
 
   const hasData = chartData.length > 0;
@@ -323,11 +369,12 @@ export function IndexHistoryChart({
         <div className="flex items-center gap-2">
           {onFetchIndexData && (
             <button
-              onClick={onFetchIndexData}
+              type="button"
+              onClick={() => onFetchIndexData()}
               disabled={loading}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
-              {loading ? 'Fetching...' : 'Fetch index data'}
+              {loading ? 'Fetching...' : 'Fetch all indexes'}
             </button>
           )}
         </div>
@@ -366,7 +413,7 @@ export function IndexHistoryChart({
         <div className="flex items-center justify-center h-[300px] text-muted-foreground">
           <div className="text-center">
             <p>No index data loaded</p>
-            <p className="text-sm">Click "Fetch index data" to load historical data</p>
+            <p className="text-sm">Click "Fetch all indexes" to load historical data</p>
           </div>
         </div>
       ) : (
@@ -374,7 +421,11 @@ export function IndexHistoryChart({
           <ComposedChart data={chartData} margin={{ left: -10, right: -10, top: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
-              dataKey="dateFormatted"
+              dataKey="dateTs"
+              type="number"
+              scale="time"
+              domain={['dataMin', 'dataMax']}
+              tickFormatter={(value) => formatLabelDateShort(value)}
               tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
               axisLine={{ stroke: 'hsl(var(--border))' }}
             />
@@ -397,9 +448,10 @@ export function IndexHistoryChart({
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null;
                 const row = payload[0]?.payload as ChartRow;
+                const labelDate = formatLabelDateShort(label);
                 return (
                   <div className="rounded-lg border bg-popover p-3 shadow-md">
-                    <p className="mb-2 font-medium">{`Date: ${label}`}</p>
+                    <p className="mb-2 font-medium">{`Date: ${labelDate}`}</p>
                     <div className="space-y-2">
                       {visibleSeriesConfigs.map((config) => {
                         const value = row[config.valueKey];
@@ -448,7 +500,7 @@ export function IndexHistoryChart({
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 3, fill: config.color }}
-                  connectNulls={false}
+                  connectNulls={true}
                 />
                 <Line
                   type="monotone"
@@ -459,7 +511,7 @@ export function IndexHistoryChart({
                   dot={false}
                   activeDot={false}
                   strokeOpacity={0.95}
-                  connectNulls={false}
+                  connectNulls={true}
                 />
                 <Line
                   type="monotone"
@@ -470,7 +522,7 @@ export function IndexHistoryChart({
                   dot={false}
                   activeDot={false}
                   strokeOpacity={0.4}
-                  connectNulls={false}
+                  connectNulls={true}
                 />
                 <Line
                   type="monotone"
@@ -481,7 +533,7 @@ export function IndexHistoryChart({
                   dot={false}
                   activeDot={false}
                   strokeOpacity={0.4}
-                  connectNulls={false}
+                  connectNulls={true}
                 />
               </React.Fragment>
             ))}
