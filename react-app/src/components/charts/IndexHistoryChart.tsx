@@ -73,6 +73,11 @@ const getTodayStartLocal = (): Date => {
   return today;
 };
 
+const getTodayStartUtc = (): Date => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+};
+
 const toFieldPrefix = (symbol: string): string => symbol.replace(/[^a-zA-Z0-9]/g, '_');
 
 const formatValue = (value: number): string => {
@@ -257,6 +262,7 @@ export function IndexHistoryChart({
         const points = filteredDataBySymbol[config.symbol] ?? [];
         if (points.length === 0) return null;
         const latestPoint = points.reduce((latest, point) => (point.date > latest.date ? point : latest), points[0]);
+        const trendStats = indexTrendStatsBySymbol[config.symbol] ?? null;
         const value = latestPoint.value ?? null;
         const trend = latestPoint.trend ?? null;
         const trendLowerBound = latestPoint.trendLowerBound ?? null;
@@ -265,16 +271,48 @@ export function IndexHistoryChart({
         const sigmasFromTrend = value !== null && trend !== null && sigmaAbs !== null && sigmaAbs !== 0
           ? (value - trend) / sigmaAbs
           : null;
+
+        let todayMinusOneSigmaLevel: number | null = null;
+        let todayMinusOneSigmaDelta: number | null = null;
+        if (
+          config.symbol === APP_CONFIG.API.EUNL_SYMBOL
+          && trendStats
+          && trend !== null
+          && Number.isFinite(trend)
+        ) {
+          const latestPointDate = new Date(latestPoint.date);
+          const todayStartUtc = getTodayStartUtc();
+          if (!Number.isNaN(latestPointDate.getTime())) {
+            const daysFromLatestToToday = Math.max(
+              0,
+              (todayStartUtc.getTime() - latestPointDate.getTime()) / (24 * 60 * 60 * 1000)
+            );
+            const dailyGrowthRate = trendStats.annualGrowthRate / 365;
+            const projectedTodayTrend = trend * Math.exp(dailyGrowthRate * daysFromLatestToToday);
+            const projectedTodayDelta = projectedTodayTrend * trendStats.standardDeviation;
+            const projectedTodayLowerBound = Math.max(0, projectedTodayTrend - projectedTodayDelta);
+
+            if (Number.isFinite(projectedTodayDelta) && Number.isFinite(projectedTodayLowerBound)) {
+              todayMinusOneSigmaDelta = projectedTodayDelta;
+              todayMinusOneSigmaLevel = projectedTodayLowerBound;
+            }
+          }
+        }
+
         return {
           config,
-          trendStats: indexTrendStatsBySymbol[config.symbol] ?? null,
+          trendStats,
           diffPct,
           sigmasFromTrend,
           multiplier: latestPoint.multiplier ?? null,
+          todayMinusOneSigmaLevel,
+          todayMinusOneSigmaDelta,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [filteredDataBySymbol, indexTrendStatsBySymbol, seriesConfigs]);
+
+  const todayLabel = formatDateWithDayUtc(getTodayStartUtc());
 
   const visibleSeriesConfigs = React.useMemo(
     () => seriesConfigs.filter((config) => visibleSymbols[config.symbol]),
@@ -338,13 +376,15 @@ export function IndexHistoryChart({
       return null;
     }
 
+    const sourceLinkButtonClassName = 'px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs';
+
     return (
       <div className="mt-2 flex items-center gap-1.5 flex-wrap">
         {yahooSeries.map((series) => (
           <button
             key={series.symbol}
             onClick={() => openUrl(series.sourceUrl)}
-            className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+            className={sourceLinkButtonClassName}
           >
             {series.shortLabel} on Yahoo
           </button>
@@ -353,7 +393,7 @@ export function IndexHistoryChart({
           <button
             key={series.symbol}
             onClick={() => openUrl(series.sourceUrl)}
-            className="px-2 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-xs"
+            className={sourceLinkButtonClassName}
           >
             {series.shortLabel} on Morningstar
           </button>
@@ -546,7 +586,7 @@ export function IndexHistoryChart({
 
       {latestMetrics.length > 0 && (
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-2 text-sm text-muted-foreground">
-          {latestMetrics.map(({ config, trendStats, diffPct, sigmasFromTrend, multiplier }) => (
+          {latestMetrics.map(({ config, trendStats, diffPct, sigmasFromTrend, multiplier, todayMinusOneSigmaLevel, todayMinusOneSigmaDelta }) => (
             <div key={`metrics-${config.symbol}`} className="rounded border border-border/50 px-3 py-2">
               <div className="font-semibold" style={{ color: config.color }}>
                 {config.shortLabel}
@@ -581,6 +621,16 @@ export function IndexHistoryChart({
                   {typeof multiplier === 'number' && Number.isFinite(multiplier) ? `${multiplier.toFixed(3)}x` : 'N/A'}
                 </span>
               </div>
+              {config.symbol === APP_CONFIG.API.EUNL_SYMBOL && (
+                <div>
+                  Today -σ ({todayLabel}):{' '}
+                  <span className="font-semibold text-foreground">
+                    {typeof todayMinusOneSigmaLevel === 'number' && Number.isFinite(todayMinusOneSigmaLevel)
+                      ? formatValue(todayMinusOneSigmaLevel)
+                      : 'N/A'}
+                  </span>{' '}€
+                </div>
+              )}
             </div>
           ))}
         </div>

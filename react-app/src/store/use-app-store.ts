@@ -192,6 +192,37 @@ export const useAppStore = create<AppState>()(
             }
           };
 
+          type FallbackSource = {
+            sourceName: string;
+            url: string;
+            proxyUrl?: string;
+          };
+
+          let preferredExternalProxyUrl: string | null = null;
+
+          const getOrderedExternalProxies = (): string[] => {
+            const configuredProxies = APP_CONFIG.API.CORS_PROXIES;
+            if (!preferredExternalProxyUrl) {
+              return [...configuredProxies];
+            }
+
+            const preferredIndex = configuredProxies.indexOf(preferredExternalProxyUrl);
+            if (preferredIndex < 0) {
+              return [...configuredProxies];
+            }
+
+            return [
+              ...configuredProxies.slice(preferredIndex),
+              ...configuredProxies.slice(0, preferredIndex),
+            ];
+          };
+
+          const rememberPreferredExternalProxy = (proxyUrl?: string): void => {
+            if (proxyUrl) {
+              preferredExternalProxyUrl = proxyUrl;
+            }
+          };
+
           const createSourceUrls = ({
             targetUrl,
             sameOriginUrl,
@@ -202,8 +233,8 @@ export const useAppStore = create<AppState>()(
             sameOriginUrl?: string;
             includeDirect?: boolean;
             includeExternalProxies?: boolean;
-          }): Array<{ sourceName: string; url: string }> => {
-            const sources: Array<{ sourceName: string; url: string }> = [];
+          }): FallbackSource[] => {
+            const sources: FallbackSource[] = [];
 
             if (sameOriginUrl) {
               sources.push({ sourceName: 'same-origin-proxy', url: sameOriginUrl });
@@ -214,9 +245,10 @@ export const useAppStore = create<AppState>()(
             }
 
             if (includeExternalProxies) {
-              const proxiedUrls = APP_CONFIG.API.CORS_PROXIES.map((proxyUrl) => ({
+              const proxiedUrls = getOrderedExternalProxies().map((proxyUrl) => ({
                 sourceName: getProxySourceName(proxyUrl),
                 url: `${proxyUrl}${encodeURIComponent(targetUrl)}`,
+                proxyUrl,
               }));
               sources.push(...proxiedUrls);
             }
@@ -292,6 +324,7 @@ export const useAppStore = create<AppState>()(
                   throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
+                rememberPreferredExternalProxy(source.proxyUrl);
                 return {
                   data: await response.json() as T,
                   sourceName: source.sourceName,
@@ -342,6 +375,7 @@ export const useAppStore = create<AppState>()(
                   throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
+                rememberPreferredExternalProxy(source.proxyUrl);
                 return {
                   data: await response.text(),
                   sourceName: source.sourceName,
