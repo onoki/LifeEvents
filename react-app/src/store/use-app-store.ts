@@ -306,6 +306,44 @@ export const useAppStore = create<AppState>()(
               requestInit,
             } = options;
             const sourceErrors: string[] = [];
+            const parseJsonPayload = (raw: string): T => {
+              const trimmed = raw.trim();
+              if (!trimmed) {
+                throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
+              }
+
+              const candidates: string[] = [trimmed];
+
+              // Some proxies prepend XSSI guards.
+              if (trimmed.startsWith(")]}'")) {
+                candidates.push(trimmed.replace(/^\)\]\}'\s*/, ''));
+              }
+
+              // Some proxies wrap payloads in a JSON envelope.
+              if (trimmed.startsWith('{')) {
+                try {
+                  const parsedEnvelope = JSON.parse(trimmed) as { contents?: unknown; data?: unknown };
+                  if (typeof parsedEnvelope.contents === 'string') {
+                    candidates.push(parsedEnvelope.contents.trim());
+                  }
+                  if (typeof parsedEnvelope.data === 'string') {
+                    candidates.push(parsedEnvelope.data.trim());
+                  }
+                } catch {
+                  // ignore envelope parse failure and continue with raw candidates
+                }
+              }
+
+              for (const candidate of candidates) {
+                try {
+                  return JSON.parse(candidate) as T;
+                } catch {
+                  // try next candidate
+                }
+              }
+
+              throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
+            };
 
             for (const source of createSourceUrls({
               targetUrl,
@@ -324,9 +362,10 @@ export const useAppStore = create<AppState>()(
                   throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
+                const rawText = await response.text();
                 rememberPreferredExternalProxy(source.proxyUrl);
                 return {
-                  data: await response.json() as T,
+                  data: parseJsonPayload(rawText),
                   sourceName: source.sourceName,
                 };
               } catch (err) {
@@ -698,7 +737,7 @@ export const useAppStore = create<AppState>()(
                 : {
                     'Accept': 'application/json,text/plain,*/*',
                   },
-              includeDirect: false,
+              includeDirect: true,
               includeExternalProxies: !useSameOriginProxy,
               requestInit: {
                 cache: 'no-store',

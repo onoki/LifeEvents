@@ -110,26 +110,26 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       variant: 'note'
     },
     {
-      label: 'Minimum required monthly contribution',
+      label: 'Min required contribution',
       description: 'Minimum monthly contributions until the last month to reach the investment goal, assuming the set annual growth.',
       color: '#3b82f6',
       variant: 'area'
     },
     {
-      label: 'Target minimum required contribution',
+      label: 'Target min required contribution',
       description: 'Projected minimum monthly contributions after the last recorded month to reach the investment goal.',
       color: '#10b981',
       variant: 'line'
     },
     {
-      label: 'Monthly contribution adjusted for index trend',
+      label: 'Contribution (index trend)',
       description: 'Minimum monthly contributions adjusted to the selected index trend instead of the daily price.',
       color: '#8b5cf6',
       strokeDasharray: '5 5',
       variant: 'line'
     },
     {
-      label: 'Target contribution adjusted for index trend',
+      label: 'Target contribution (index trend)',
       description: 'Projected contributions adjusted to the selected index trend after the last recorded month.',
       color: '#10b981',
       strokeDasharray: '5 5',
@@ -484,10 +484,10 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
                 color: 'hsl(var(--popover-foreground))'
               }}
               formatter={(value, name) => {
-                const label = name === 'minRequiredContributionArea' ? 'Minimum required monthly contribution' : 
-                             name === 'minRequiredContributionLine' ? 'Target minimum required contribution' :
-                             name === 'minRequiredContributionAdjustedArea' ? 'Monthly contribution adjusted for index trend' :
-                             name === 'minRequiredContributionAdjustedLine' ? 'Target contribution adjusted for index trend' :
+                const label = name === 'minRequiredContributionArea' ? 'Min required contribution' : 
+                             name === 'minRequiredContributionLine' ? 'Target min required contribution' :
+                             name === 'minRequiredContributionAdjustedArea' ? 'Contribution (index trend)' :
+                             name === 'minRequiredContributionAdjustedLine' ? 'Target contribution (index trend)' :
                              name === 'expectedMinRequiredContribution' ? 'Expected estimate' :
                              name === 'targetLine' ? 'Target' : 'Unknown';
                 return [formatCurrency(value as number), label];
