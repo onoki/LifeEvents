@@ -131,7 +131,7 @@ export function StockChart({
       variant: 'area'
     },
     {
-      label: 'Current value adjusted for index trend',
+      label: 'Current value (index trend)',
       description: 'The stocks adjusted to the selected index trend instead of the daily price.',
       color: '#8b5cf6',
       strokeDasharray: '5 5',
@@ -144,7 +144,7 @@ export function StockChart({
       variant: 'line'
     },
     {
-      label: 'Target with minimum contributions',
+      label: 'Target (min contributions)',
       description: 'The expected trajectory of stocks value assuming the annual growth and the minimum contributions from this point forward required to reach the investment goal.',
       color: '#10b981',
       variant: 'line'
@@ -285,10 +285,10 @@ export function StockChart({
               formatter={(value, name) => {
                 const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
                 const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
-                             name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value adjusted for index trend' :
+                             name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value (index trend)' :
                              name === 'plannedContributionLine' ? 'Planned contributions path' :
                              name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
-                             name === 'targetWithMinimumContribution' ? 'Target with minimum contributions' :
+                             name === 'targetWithMinimumContribution' ? 'Target (min contributions)' :
                              name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
                              name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
                              name === 'lineWithTrendGrowth' ? trendGrowthLabel :
