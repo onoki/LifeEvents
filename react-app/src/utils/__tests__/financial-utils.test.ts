@@ -218,6 +218,9 @@ describe('financial-utils', () => {
       expect(result[0].targetWithMinimumContribution).toBeCloseTo(200, 6);
       expect(result[1].targetWithMinimumContribution).toBeCloseTo(230, 6);
       expect(result[2].targetWithMinimumContribution).toBeCloseTo(260, 6);
+      expect(result[0].targetWithFixedContribution).toBeCloseTo(200, 6);
+      expect(result[1].targetWithFixedContribution).toBeCloseTo(230, 6);
+      expect(result[2].targetWithFixedContribution).toBeCloseTo(260, 6);
     });
 
     it('projects growth scenario lines from the latest stock point', () => {

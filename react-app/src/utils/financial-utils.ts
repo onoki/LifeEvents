@@ -181,7 +181,7 @@ export function calculateTargetWithFixedContribution(
   const fullPeriodFactors = calculateGrowthAndContributionFactors(
     getMonthlyRatesBetween(firstDate, lastDate, config)
   );
-  const futureValueOfFirst = firstStocksValue * fullPeriodFactors.growthFactor;
+  const futureValueOfFirst = firstAdjustedValue * fullPeriodFactors.growthFactor;
   const remainingToGoal = investmentGoal - futureValueOfFirst;
   const baselineMonthlyContribution = fullPeriodFactors.contributionFactor === 0
     ? 0
