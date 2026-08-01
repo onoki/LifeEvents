@@ -2,7 +2,13 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useKPICalculations } from '../../hooks/use-kpi-calculations';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
-import { calculateTargetWithFixedContribution, calculateCurrentStockEstimate, calculateRequiredMonthlyContribution, formatPercentage } from '../../utils/financial-utils';
+import {
+  calculateTargetWithFixedContribution,
+  calculateCurrentStockEstimate,
+  calculateRequiredMonthlyContributionForDates,
+  formatPercentage,
+  getAnnualGrowthRateForDate
+} from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
 import { APP_CONFIG } from '../../config/app-config';
 import type { Config, Event, MiniReward } from '../../types';
@@ -44,17 +50,6 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
     const parsed = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
     return Number.isFinite(parsed) ? parsed : APP_CONFIG.DEFAULTS.INVESTMENT_GOAL;
   }, [config.investment_goal]);
-  const annualGrowthRate = React.useMemo(() => {
-    const parsed = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
-    return Number.isFinite(parsed) ? parsed : APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE;
-  }, [config.annual_growth_rate]);
-
-  const monthsRemainingNow = React.useMemo(() => {
-    if (!lastDate) return 0;
-    const remainingDays = daysBetween(currentTime, lastDate);
-    return Math.max(0, remainingDays / DAYS_PER_MONTH);
-  }, [currentTime, lastDate]);
-
   const initialRequired = React.useMemo(() => {
     if (!chartData || chartData.length === 0) return 0;
     const first = chartData[0];
@@ -70,13 +65,15 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
   }, [data, config, currentTime, chartData]);
 
   const currentRequired = React.useMemo(() => {
-    return calculateRequiredMonthlyContribution(
+    if (!lastDate) return 0;
+    return calculateRequiredMonthlyContributionForDates(
       stockEstimate.currentEstimate,
       goal,
-      annualGrowthRate,
-      monthsRemainingNow
+      config,
+      currentTime,
+      lastDate
     );
-  }, [annualGrowthRate, goal, monthsRemainingNow, stockEstimate.currentEstimate]);
+  }, [config, currentTime, goal, lastDate, stockEstimate.currentEstimate]);
 
   const currentPercentRaw = React.useMemo(() => {
     if (!Number.isFinite(initialRequired) || initialRequired <= 0) return 0;
@@ -117,21 +114,24 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
 
     let projectedValue = stockEstimate.currentEstimate;
     let dayCursor = new Date(currentTime);
-    const dailyGrowthRate = annualGrowthRate / 365;
     const contributionPerDay = stockEstimate.contributionPerDay;
     let lastProjectedRequired = currentRequired;
     let lastProjectedValue = projectedValue;
     let lastMonthsRemaining = Math.max(0, daysBetween(dayCursor, lastDate) / DAYS_PER_MONTH);
+    let lastDailyGrowthRate = getAnnualGrowthRateForDate(config, dayCursor) / 365;
 
     for (let day = 1; day <= maxDays; day++) {
+      const dailyGrowthRate = getAnnualGrowthRateForDate(config, dayCursor) / 365;
+      lastDailyGrowthRate = dailyGrowthRate;
       projectedValue = projectedValue * (1 + dailyGrowthRate) + contributionPerDay;
       dayCursor = new Date(dayCursor.getTime() + MS_PER_DAY);
       const monthsRemaining = Math.max(0, daysBetween(dayCursor, lastDate) / DAYS_PER_MONTH);
-      const projectedRequired = calculateRequiredMonthlyContribution(
+      const projectedRequired = calculateRequiredMonthlyContributionForDates(
         projectedValue,
         goal,
-        annualGrowthRate,
-        monthsRemaining
+        config,
+        dayCursor,
+        lastDate
       );
       lastProjectedValue = projectedValue;
       lastProjectedRequired = projectedRequired;
@@ -160,7 +160,7 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
       debug: {
         status: 'not_reached',
         targetRequired,
-        dailyGrowthRate,
+        dailyGrowthRate: lastDailyGrowthRate,
         contributionPerDay,
         maxDays,
         lastProjectedValue,
@@ -169,7 +169,7 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
       }
     };
   }, [
-    annualGrowthRate,
+    config,
     currentRequired,
     currentTime,
     goal,

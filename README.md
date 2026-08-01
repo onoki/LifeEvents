@@ -70,7 +70,8 @@ Configuration (key/value pairs):
 
 ```
 investment_goal    1000000
-annual_growth_rate 0.07
+annual_growth_rate_near_term 0.10
+annual_growth_rate_long_term 0.07
 planned_monthly_contribution 500
 planned_monthly_contributions_until 2026-01-01
 ```

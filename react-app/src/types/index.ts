@@ -27,7 +27,8 @@ export interface MiniReward {
 export interface Config {
   [key: string]: string | undefined;
   investment_goal?: string;
-  annual_growth_rate?: string;
+  annual_growth_rate_near_term?: string;
+  annual_growth_rate_long_term?: string;
   planned_monthly_contribution?: string;
   planned_monthly_contributions_until?: string;
 }

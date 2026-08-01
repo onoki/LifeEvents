@@ -99,8 +99,8 @@ export const APP_CONFIG = {
   // Default values
   DEFAULTS: {
     INVESTMENT_GOAL: 1000000, // 1 million EUR
-    ANNUAL_GROWTH_RATE: 0.07, // 7%
-    MONTHLY_GROWTH_RATE: 0.07 / 12,
+    ANNUAL_GROWTH_RATE_NEAR_TERM: 0.07, // 7%
+    ANNUAL_GROWTH_RATE_LONG_TERM: 0.07, // 7%
   },
 
   // Error messages

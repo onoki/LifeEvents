@@ -126,7 +126,7 @@ function App(): React.JSX.Element {
                   <div className="space-y-3">
                     <div>
                       <p className="font-medium">📋 Configuration Section:</p>
-                      <p className="font-mono text-xs ml-2">investment_goal, annual_growth_rate</p>
+                      <p className="font-mono text-xs ml-2">investment_goal, annual_growth_rate_near_term, annual_growth_rate_long_term</p>
                     </div>
                     
                     <div>

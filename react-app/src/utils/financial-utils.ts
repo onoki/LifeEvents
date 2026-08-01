@@ -2,34 +2,122 @@ import { APP_CONFIG } from '../config/app-config';
 import type { Event, Config, ChartDataPoint } from '../types';
 import { parseNumeric } from './number-utils';
 
-/**
- * Calculate target value with fixed monthly contribution
- */
-export function calculateRequiredMonthlyContribution(
+const monthsBetween = (start: Date, end: Date) =>
+  (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+
+const monthIndex = (date: Date) => date.getFullYear() * 12 + date.getMonth();
+
+export const isDateInOrBeforeMonth = (date: Date, cutoff: Date): boolean =>
+  monthIndex(date) <= monthIndex(cutoff);
+
+export const isDateAfterMonth = (date: Date, cutoff: Date): boolean =>
+  monthIndex(date) > monthIndex(cutoff);
+
+const parseGrowthRate = (value: string | undefined, fallback: number): number => {
+  const parsed = parseNumeric(value || fallback.toString());
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+export function getAnnualGrowthRateForDate(config: Config, date: Date): number {
+  const nearTermRate = parseGrowthRate(
+    config.annual_growth_rate_near_term,
+    APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_NEAR_TERM
+  );
+  const longTermRate = parseGrowthRate(
+    config.annual_growth_rate_long_term,
+    APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_LONG_TERM
+  );
+  const plannedUntil = config.planned_monthly_contributions_until
+    ? new Date(config.planned_monthly_contributions_until)
+    : null;
+  if (!plannedUntil || Number.isNaN(plannedUntil.getTime())) return nearTermRate;
+  return isDateInOrBeforeMonth(date, plannedUntil) ? nearTermRate : longTermRate;
+}
+
+const getMonthlyRatesBetween = (
+  start: Date,
+  end: Date,
+  config: Config,
+  annualRateDelta = 0
+): number[] => {
+  const monthCount = Math.max(0, monthsBetween(start, end));
+  return Array.from({ length: monthCount }, (_, index) => {
+    const destinationMonth = new Date(start.getFullYear(), start.getMonth() + index + 1, 1);
+    return (getAnnualGrowthRateForDate(config, destinationMonth) + annualRateDelta) / 12;
+  });
+};
+
+const calculateGrowthAndContributionFactors = (monthlyRates: number[]) => {
+  let growthFactor = 1;
+  let contributionFactor = 0;
+  monthlyRates.forEach((monthlyRate) => {
+    growthFactor *= 1 + monthlyRate;
+    contributionFactor = contributionFactor * (1 + monthlyRate) + 1;
+  });
+  return { growthFactor, contributionFactor };
+};
+
+export function calculateRequiredMonthlyContributionForDatesRaw(
   currentValue: number,
   goal: number,
-  annualGrowthRate: number,
-  monthsRemaining: number
+  config: Config,
+  start: Date,
+  end: Date
 ): number {
-  if (!Number.isFinite(currentValue) || !Number.isFinite(goal) || !Number.isFinite(annualGrowthRate)) {
-    return 0;
+  if (!Number.isFinite(currentValue) || !Number.isFinite(goal) || end <= start) return 0;
+  const { growthFactor, contributionFactor } = calculateGrowthAndContributionFactors(
+    getMonthlyRatesBetween(start, end, config)
+  );
+  if (contributionFactor === 0) return 0;
+  return (goal - currentValue * growthFactor) / contributionFactor;
+}
+
+export function calculateRequiredMonthlyContributionForDates(
+  currentValue: number,
+  goal: number,
+  config: Config,
+  start: Date,
+  end: Date
+): number {
+  return Math.max(0, calculateRequiredMonthlyContributionForDatesRaw(
+    currentValue,
+    goal,
+    config,
+    start,
+    end
+  ));
+}
+
+export function calculateGrowthFactorForDates(config: Config, start: Date, end: Date): number {
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  if (end.getTime() === start.getTime()) return 1;
+  const plannedUntil = config.planned_monthly_contributions_until
+    ? new Date(config.planned_monthly_contributions_until)
+    : null;
+  const validCutoff = plannedUntil && !Number.isNaN(plannedUntil.getTime()) ? plannedUntil : null;
+  const growForDays = (rate: number, days: number) => Math.pow(1 + rate / 365, days);
+
+  const longTermStarts = validCutoff
+    ? new Date(validCutoff.getFullYear(), validCutoff.getMonth() + 1, 1)
+    : null;
+
+  if (!validCutoff || !longTermStarts) {
+    const days = (end.getTime() - start.getTime()) / millisecondsPerDay;
+    return growForDays(getAnnualGrowthRateForDate(config, end), days);
   }
-  if (monthsRemaining <= 0) return 0;
-  const monthlyRate = annualGrowthRate / 12;
-  if (monthlyRate === 0) {
-    return Math.max(0, (goal - currentValue) / monthsRemaining);
+  if (end <= longTermStarts) {
+    const days = (end.getTime() - start.getTime()) / millisecondsPerDay;
+    return growForDays(getAnnualGrowthRateForDate(config, validCutoff), days);
   }
-  const pow1p = (rate: number, n: number) => Math.pow(1 + rate, n);
-  const annuityFactor = (rate: number, n: number) => {
-    if (n <= 0) return 0;
-    if (rate === 0) return n;
-    return (pow1p(rate, n) - 1) / rate;
-  };
-  const futureValue = currentValue * pow1p(monthlyRate, monthsRemaining);
-  const remaining = goal - futureValue;
-  const denominator = annuityFactor(monthlyRate, monthsRemaining);
-  if (denominator === 0) return 0;
-  return Math.max(0, remaining / denominator);
+  if (start >= longTermStarts) {
+    const days = (end.getTime() - start.getTime()) / millisecondsPerDay;
+    return growForDays(getAnnualGrowthRateForDate(config, end), days);
+  }
+
+  const nearTermDays = (longTermStarts.getTime() - start.getTime()) / millisecondsPerDay;
+  const longTermDays = (end.getTime() - longTermStarts.getTime()) / millisecondsPerDay;
+  return growForDays(getAnnualGrowthRateForDate(config, validCutoff), nearTermDays)
+    * growForDays(getAnnualGrowthRateForDate(config, end), longTermDays);
 }
 
 export function calculateTargetWithFixedContribution(
@@ -40,30 +128,19 @@ export function calculateTargetWithFixedContribution(
   if (!data || data.length === 0) return [];
   
   // Financial calculation helpers
-  const pow1p = (rate: number, months: number) => Math.pow(1 + rate, months);
   // annuity factor means “how much 1 € per month turns into after N months at rate r"
-  const annuityFactor = (rate: number, monthsRemaining: number) => {
-    if (monthsRemaining <= 0) return 0;
-    if (rate === 0) return monthsRemaining;
-    return (pow1p(rate, monthsRemaining) - 1) / rate;
-  };
-  const requiredPayment = (remaining: number, rate: number, monthsRemaining: number) => {
-    if (monthsRemaining <= 0) return 0;
-    if (rate === 0) return remaining / monthsRemaining;
-    return remaining / annuityFactor(rate, monthsRemaining);
-  };
   const calculateMinRequiredContribution = (
     currentValue: number,
     goal: number,
-    monthlyRate: number,
-    monthsRemaining: number
+    start: Date,
+    end: Date
   ): number => {
-    const futureValue = currentValue * pow1p(monthlyRate, monthsRemaining);
-    const remaining = goal - futureValue;
-    return requiredPayment(remaining, monthlyRate, monthsRemaining);
+    const { growthFactor, contributionFactor } = calculateGrowthAndContributionFactors(
+      getMonthlyRatesBetween(start, end, config)
+    );
+    if (contributionFactor === 0) return 0;
+    return (goal - currentValue * growthFactor) / contributionFactor;
   };
-  const monthsBetween = (start: Date, end: Date) =>
-    (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
   const getAdjustedValue = (
     rawValue: number | null,
     trendRate: string | number | undefined | null
@@ -76,25 +153,20 @@ export function calculateTargetWithFixedContribution(
   
   // Configuration parameters
   const investmentGoal = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
-  const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
-  const monthlyGrowthRate = annualGrowthRate / 12;
   const plannedMonthlyContribution = parseNumeric(config.planned_monthly_contribution || '0');
   const plannedUntilDate = config.planned_monthly_contributions_until 
     ? new Date(config.planned_monthly_contributions_until) 
     : null;
   const hasValidPlannedUntil = plannedUntilDate !== null && !Number.isNaN(plannedUntilDate.getTime());
   const hasTrendGrowth = trendAnnualGrowthRate !== undefined && trendAnnualGrowthRate !== null;
-  const monthlyRateMinusOne = (annualGrowthRate - 0.01) / 12;
-  const monthlyRatePlusOne = (annualGrowthRate + 0.01) / 12;
-  const monthlyTrendRate = hasTrendGrowth ? trendAnnualGrowthRate / 12 : 0;
   const shouldApplyPlannedContribution = (date: Date) =>
-    plannedMonthlyContribution > 0 && (!hasValidPlannedUntil || date <= plannedUntilDate!);
+    plannedMonthlyContribution > 0
+    && (!hasValidPlannedUntil || isDateInOrBeforeMonth(date, plannedUntilDate!));
   
   // Prepare data
   const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
   const firstDate = sortedData[0].date;
   const lastDate = sortedData[sortedData.length - 1].date;
-  const totalMonths = monthsBetween(firstDate, lastDate) + 1;
   
   // Find first stocks data point
   const firstStocksData = sortedData.find(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
@@ -106,9 +178,14 @@ export function calculateTargetWithFixedContribution(
     : firstStocksValue;
   
   // Calculate baseline monthly contribution needed
-  const futureValueOfFirst = firstStocksValue * pow1p(monthlyGrowthRate, totalMonths - 1);
+  const fullPeriodFactors = calculateGrowthAndContributionFactors(
+    getMonthlyRatesBetween(firstDate, lastDate, config)
+  );
+  const futureValueOfFirst = firstStocksValue * fullPeriodFactors.growthFactor;
   const remainingToGoal = investmentGoal - futureValueOfFirst;
-  const baselineMonthlyContribution = requiredPayment(remainingToGoal, monthlyGrowthRate, Math.max(0, totalMonths - 1));
+  const baselineMonthlyContribution = fullPeriodFactors.contributionFactor === 0
+    ? 0
+    : remainingToGoal / fullPeriodFactors.contributionFactor;
   
   // Find latest data point with stocks data
   const latestDataPoint = sortedData
@@ -135,20 +212,18 @@ export function calculateTargetWithFixedContribution(
     latestMinRequiredAdjusted: 0,
     expectedProjectionValue: 0,
     expectedMinRequired: 0,
+    fixedContributionLine: firstAdjustedValue,
   };
   
   // Initialize planned min required contribution for first month
-  const firstMonthsRemaining = Math.max(0, totalMonths - 1);
   projectionState.plannedMinRequired = calculateMinRequiredContribution(
     firstAdjustedValue,
     investmentGoal,
-    monthlyGrowthRate,
-    firstMonthsRemaining
+    firstDate,
+    lastDate
   );
   
   const result = sortedData.map((item, index) => {
-    const monthsFromStart = monthsBetween(firstDate, item.date);
-    const monthsRemaining = Math.max(0, totalMonths - monthsFromStart - 1);
     const rawStocksValue = item.stocks_in_eur ? parseNumeric(item.stocks_in_eur) : null;
     const currentValue = rawStocksValue ?? 0;
     const adjustedValue = getAdjustedValue(rawStocksValue, item.eunl_rate_to_trend);
@@ -156,18 +231,34 @@ export function calculateTargetWithFixedContribution(
     const contributesThisMonth = shouldApplyPlannedContribution(item.date);
     const isLatestDataPoint = index === latestDataPointIndex;
     const isFuturePoint = index > latestDataPointIndex;
+    const monthlyGrowthRate = getAnnualGrowthRateForDate(config, item.date) / 12;
+    const monthlyRateMinusOne = (getAnnualGrowthRateForDate(config, item.date) - 0.01) / 12;
+    const monthlyRatePlusOne = (getAnnualGrowthRateForDate(config, item.date) + 0.01) / 12;
+    const monthlyTrendRate = hasTrendGrowth
+      ? (hasValidPlannedUntil && isDateAfterMonth(item.date, plannedUntilDate!)
+          ? monthlyGrowthRate
+          : trendAnnualGrowthRate / 12)
+      : 0;
 
     // Capital required at/after the planned-contribution cutoff for growth alone
     // to reach the investment goal at the end of the shared chart horizon.
     const isAtOrAfterPlannedUntil = hasValidPlannedUntil
       && monthsBetween(plannedUntilDate!, item.date) >= 0;
+    const futureGrowthFactor = calculateGrowthAndContributionFactors(
+      getMonthlyRatesBetween(item.date, lastDate, config)
+    ).growthFactor;
     const growthOnlyGoalLine = isAtOrAfterPlannedUntil
-      ? investmentGoal / pow1p(monthlyGrowthRate, monthsRemaining)
+      ? investmentGoal / futureGrowthFactor
       : null;
     
     // Calculate target value with fixed contribution
-    const targetValue = firstAdjustedValue * pow1p(monthlyGrowthRate, monthsFromStart) + 
-                       baselineMonthlyContribution * annuityFactor(monthlyGrowthRate, monthsFromStart);
+    let targetValue = projectionState.fixedContributionLine;
+    if (index > 0) {
+      getMonthlyRatesBetween(sortedData[index - 1].date, item.date, config).forEach((rate) => {
+        targetValue = targetValue * (1 + rate) + baselineMonthlyContribution;
+      });
+      projectionState.fixedContributionLine = targetValue;
+    }
     
     // Calculate minimum required contributions
     let minRequiredContribution = 0;
@@ -178,8 +269,8 @@ export function calculateTargetWithFixedContribution(
       minRequiredContribution = calculateMinRequiredContribution(
         currentValue,
         investmentGoal,
-        monthlyGrowthRate,
-        monthsRemaining
+        item.date,
+        lastDate
       );
       projectionState.latestMinRequired = minRequiredContribution;
       
@@ -187,8 +278,8 @@ export function calculateTargetWithFixedContribution(
         minRequiredContributionAdjusted = calculateMinRequiredContribution(
           adjustedValue,
           investmentGoal,
-          monthlyGrowthRate,
-          monthsRemaining
+          item.date,
+          lastDate
         );
         projectionState.latestMinRequiredAdjusted = minRequiredContributionAdjusted;
       }
@@ -275,8 +366,8 @@ export function calculateTargetWithFixedContribution(
         : calculateMinRequiredContribution(
             baseValue,
             investmentGoal,
-            monthlyGrowthRate,
-            monthsRemaining
+            item.date,
+            lastDate
           );
       
       plannedContributionLine = baseValue + contribution;
@@ -291,14 +382,14 @@ export function calculateTargetWithFixedContribution(
       projectionState.plannedProjectionValue = projectionState.plannedProjectionValue * (1 + monthlyGrowthRate)
         + (contributesThisMonth ? plannedMonthlyContribution : 0);
       
-      if (hasValidPlannedUntil && item.date > plannedUntilDate!) {
+      if (hasValidPlannedUntil && isDateAfterMonth(item.date, plannedUntilDate!)) {
         plannedMinRequiredContribution = projectionState.plannedMinRequired;
       } else {
         plannedMinRequiredContribution = calculateMinRequiredContribution(
           projectionState.plannedProjectionValue,
           investmentGoal,
-          monthlyGrowthRate,
-          monthsRemaining
+          item.date,
+          lastDate
         );
         projectionState.plannedMinRequired = plannedMinRequiredContribution;
       }
@@ -312,22 +403,22 @@ export function calculateTargetWithFixedContribution(
         expectedMinRequiredContribution = calculateMinRequiredContribution(
           projectionState.expectedProjectionValue,
           investmentGoal,
-          monthlyGrowthRate,
-          monthsRemaining
+          item.date,
+          lastDate
         );
         projectionState.expectedMinRequired = expectedMinRequiredContribution;
       } else if (isFuturePoint) {
         projectionState.expectedProjectionValue = projectionState.expectedProjectionValue * (1 + monthlyGrowthRate)
           + (contributesThisMonth ? plannedMonthlyContribution : 0);
 
-        if (hasValidPlannedUntil && item.date > plannedUntilDate!) {
+        if (hasValidPlannedUntil && isDateAfterMonth(item.date, plannedUntilDate!)) {
           expectedMinRequiredContribution = projectionState.expectedMinRequired;
         } else {
           expectedMinRequiredContribution = calculateMinRequiredContribution(
             projectionState.expectedProjectionValue,
             investmentGoal,
-            monthlyGrowthRate,
-            monthsRemaining
+            item.date,
+            lastDate
           );
           projectionState.expectedMinRequired = expectedMinRequiredContribution;
         }
@@ -513,16 +604,12 @@ export function calculateCurrentStockEstimate(
     }
   }
 
-  // Get configuration values
-  const annualGrowthRate = parseNumeric(config.annual_growth_rate || '0.07');
-  const dailyGrowthRate = annualGrowthRate / 365;
-
   // Calculate time difference
   const timeDiffMs = currentTime.getTime() - lastDate.getTime();
   const timeDiffDays = timeDiffMs / (1000 * 60 * 60 * 24);
 
   // Calculate growth from last recorded value (using adjusted value if available)
-  const growthFactor = Math.pow(1 + dailyGrowthRate, timeDiffDays);
+  const growthFactor = calculateGrowthFactorForDates(config, lastDate, currentTime);
   const valueFromGrowth = lastValue * growthFactor;
   const uncorrectedValueFromGrowth = baseStocksValue * growthFactor;
 
@@ -545,12 +632,22 @@ export function calculateCurrentStockEstimate(
   
   // Get planned monthly contribution or fallback to minimum contribution
   const plannedMonthlyContribution = parseNumeric(config.planned_monthly_contribution || '0');
-  const effectiveMonthlyContribution = plannedMonthlyContribution > 0 ? plannedMonthlyContribution : minimumContribution;
+  const plannedUntil = config.planned_monthly_contributions_until
+    ? new Date(config.planned_monthly_contributions_until)
+    : null;
+  const plannedContributionIsActive = plannedMonthlyContribution > 0
+    && (!plannedUntil
+      || Number.isNaN(plannedUntil.getTime())
+      || isDateInOrBeforeMonth(currentTime, plannedUntil));
+  const effectiveMonthlyContribution = plannedContributionIsActive
+    ? plannedMonthlyContribution
+    : minimumContribution;
   const contributionEffect = effectiveMonthlyContribution * contributionScale;
   const currentEstimate = valueFromGrowth + contributionEffect;
   const uncorrectedEstimate = uncorrectedValueFromGrowth + contributionEffect;
 
   // Calculate separate components for daily changes
+  const dailyGrowthRate = getAnnualGrowthRateForDate(config, currentTime) / 365;
   const growthPerDay = valueFromGrowth * dailyGrowthRate;
   const contributionPerDay = effectiveMonthlyContribution / 30;
   const totalChangePerDay = growthPerDay + contributionPerDay;

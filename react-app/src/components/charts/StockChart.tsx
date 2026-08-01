@@ -109,10 +109,10 @@ export function StockChart({
     && investmentGoal >= rightAxisDomain[0]
     && investmentGoal <= rightAxisDomain[1];
   const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
-    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth scenario (average index trend)`
+    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % index trend until cutoff, then long-term growth`
     : 'Growth scenario (average index trend)';
   const trendGrowthWithPlannedLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
-    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % growth + planned contributions`
+    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % index trend until cutoff + planned contributions, then long-term growth`
     : 'Growth + planned contributions';
   const plannedContributionAmount = config.planned_monthly_contribution;
   const plannedContributionUntil = config.planned_monthly_contributions_until;
@@ -140,26 +140,26 @@ export function StockChart({
     },
     {
       label: 'Target with fixed contributions',
-      description: 'Base line target assuming fixed contributions from the first month to the last and a set annual growth. The current value of stocks should always be higher than this.',
+      description: 'Baseline target assuming fixed contributions throughout, near-term growth through the planned-until date, and long-term growth afterward. The current value of stocks should always be higher than this.',
       color: '#ef4444',
       variant: 'line'
     },
     {
       label: 'Target (min contributions)',
-      description: 'The expected trajectory of stocks value assuming the annual growth and the minimum contributions from this point forward required to reach the investment goal.',
+      description: 'Expected trajectory using the configured near- and long-term growth phases and the minimum contributions required to reach the investment goal.',
       color: '#10b981',
       variant: 'line'
     },
     {
       label: 'n % growth scenario',
-      description: 'Various possibilities if the annual growth is slightly higher or lower than the set growth.',
+      description: 'Possibilities where both configured growth phases are one percentage point higher or lower.',
       color: '#06b6d4',
       variant: 'line',
       hidden: isSimplified
     },
     {
       label: 'Growth scenario (average index trend)',
-      description: 'Scenario based on the average historical trend growth across the four indexes. Assumes minimum contributiosn.',
+      description: 'Uses average historical index-trend growth through the planned-until date, then configured long-term growth. Assumes minimum contributions.',
       color: '#06b6d4',
       strokeDasharray: '5 5',
       variant: 'line',
@@ -167,7 +167,7 @@ export function StockChart({
     },
     {
       label: 'Growth + planned contributions',
-      description: 'Average index trend growth with planned monthly contributions until the configured planned-until date.',
+      description: 'Average index-trend growth with planned contributions through the planned-until date, then configured long-term growth.',
       color: '#06b6d4',
       strokeDasharray: '2 4',
       variant: 'line',
@@ -181,7 +181,7 @@ export function StockChart({
     },
     {
       label: 'Goal path from cutoff (growth only)',
-      description: 'Required investment value at the planned-contribution cutoff, followed by annual growth with no further contributions through the investment goal date.',
+      description: 'Required investment value at the planned-contribution cutoff, followed by long-term growth with no further contributions through the investment goal date.',
       color: '#fde68a',
       strokeDasharray: '4 6',
       variant: 'line'
@@ -307,14 +307,13 @@ export function StockChart({
                 color: 'hsl(var(--popover-foreground))'
               }}
               formatter={(value, name) => {
-                const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
                 const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
                              name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value (index trend)' :
                              name === 'plannedContributionLine' ? 'Planned contributions path' :
                              name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
                              name === 'targetWithMinimumContribution' ? 'Target (min contributions)' :
-                             name === 'lineWithMinusOnePercentGrowth' ? `${Math.round((annualGrowthRate - 0.01) * 100)} % growth scenario` :
-                             name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
+                             name === 'lineWithMinusOnePercentGrowth' ? 'Growth scenario (-1 percentage point)' :
+                             name === 'lineWithPlusOnePercentGrowth' ? 'Growth scenario (+1 percentage point)' :
                              name === 'lineWithTrendGrowth' ? trendGrowthLabel :
                              name === 'lineWithTrendGrowthAndPlannedContribution' ? trendGrowthWithPlannedLabel :
                              name === 'growthOnlyGoalLine' ? 'Goal path from cutoff (growth only)' :

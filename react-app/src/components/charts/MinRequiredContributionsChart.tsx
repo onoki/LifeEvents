@@ -1,7 +1,13 @@
 import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceDot, ReferenceLine, Label } from 'recharts';
 import type { MinRequiredContributionsChartProps } from '../../types';
-import { formatCurrency } from '../../utils/financial-utils';
+import {
+  calculateRequiredMonthlyContributionForDatesRaw,
+  formatCurrency,
+  getAnnualGrowthRateForDate,
+  isDateAfterMonth,
+  isDateInOrBeforeMonth
+} from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
@@ -47,9 +53,6 @@ const CONTRIBUTION_SCENARIOS: ScenarioDefinition[] = [
   { id: 'pause-6', label: 'Pause contributions for 6 months', shortLabel: 'Pause 6m', kind: 'pause', months: 6, color: '#d1d5db' }
 ];
 
-const monthsBetween = (start: Date, end: Date) =>
-  (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-
 const isSameMonth = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 
@@ -62,33 +65,6 @@ const clampMin = (value: number, min: number) => (value < min ? min : value);
 const formatCurrencyPerMonth = (value: number): string => {
   const base = formatCurrency(value);
   return base.includes(' €') ? base.replace(' €', ' €/m') : `${base} €/m`;
-};
-
-const calculateRequiredMonthlyContributionRaw = (
-  currentValue: number,
-  goal: number,
-  annualGrowthRate: number,
-  monthsRemaining: number
-): number => {
-  if (!Number.isFinite(currentValue) || !Number.isFinite(goal) || !Number.isFinite(annualGrowthRate)) {
-    return NaN;
-  }
-  if (monthsRemaining <= 0) return 0;
-  const monthlyRate = annualGrowthRate / 12;
-  if (monthlyRate === 0) {
-    return (goal - currentValue) / monthsRemaining;
-  }
-  const pow1p = (rate: number, n: number) => Math.pow(1 + rate, n);
-  const annuityFactor = (rate: number, n: number) => {
-    if (n <= 0) return 0;
-    if (rate === 0) return n;
-    return (pow1p(rate, n) - 1) / rate;
-  };
-  const futureValue = currentValue * pow1p(monthlyRate, monthsRemaining);
-  const remaining = goal - futureValue;
-  const denominator = annuityFactor(monthlyRate, monthsRemaining);
-  if (denominator === 0) return 0;
-  return remaining / denominator;
 };
 
 /**
@@ -111,7 +87,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
     },
     {
       label: 'Min required contribution',
-      description: 'Minimum monthly contributions until the last month to reach the investment goal, assuming the set annual growth.',
+      description: 'Minimum monthly contributions needed to reach the investment goal, using near-term growth through the planned-until date and long-term growth afterward.',
       color: '#3b82f6',
       variant: 'area'
     },
@@ -267,19 +243,15 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
     const baseMonthlyContribution = parseNumeric(config.planned_monthly_contribution || '0');
     const plannedMonthlyContribution = Number.isFinite(baseMonthlyContribution) ? baseMonthlyContribution : 0;
     const investmentGoal = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
-    const annualGrowthRate = parseNumeric(config.annual_growth_rate || APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE.toString());
-
-    if (!Number.isFinite(investmentGoal) || !Number.isFinite(annualGrowthRate)) {
+    if (!Number.isFinite(investmentGoal)) {
       return [];
     }
 
     const firstDate = fullDataSet[0]?.date;
     const lastDate = fullDataSet[fullDataSet.length - 1]?.date;
     if (!firstDate || !lastDate) return [];
-    const totalMonths = monthsBetween(firstDate, lastDate) + 1;
     const plannedUntilIndex = fullDataSet.findIndex((item) => isSameMonth(item.date, plannedUntilDate));
     if (plannedUntilIndex < 0) return [];
-    const monthsRemainingAtPlannedUntil = Math.max(0, totalMonths - monthsBetween(firstDate, plannedUntilDate) - 1);
 
     const latestIndex = [...fullDataSet]
       .map((item, index) => ({ item, index }))
@@ -289,7 +261,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
     if (latestIndex < 0) return [];
     const latestPoint = fullDataSet[latestIndex];
     const latestDate = latestPoint.date;
-    if (plannedUntilDate < latestDate) return [];
+    if (isDateAfterMonth(latestDate, plannedUntilDate)) return [];
     if (plannedUntilIndex < latestIndex) return [];
 
     const startValueRaw = typeof latestPoint.stocks_in_eur_adjusted_for_eunl_trend === 'number'
@@ -300,8 +272,6 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
     if (typeof startValueRaw !== 'number' || !Number.isFinite(startValueRaw)) {
       return [];
     }
-
-    const monthlyGrowthRate = annualGrowthRate / 12;
 
     const monthlyContributionForScenario = (
       scenario: ScenarioDefinition,
@@ -335,7 +305,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       const stepsToPlanned = plannedUntilIndex - latestIndex;
       for (let stepIndex = 1; stepIndex <= stepsToPlanned; stepIndex += 1) {
         const stepDate = fullDataSet[latestIndex + stepIndex]?.date ?? plannedUntilDate;
-        const appliesPlanned = stepDate <= plannedUntilDate;
+        const appliesPlanned = isDateInOrBeforeMonth(stepDate, plannedUntilDate);
         const baseContribution = appliesPlanned ? plannedMonthlyContribution : 0;
         let contribution = monthlyContributionForScenario(scenario, stepIndex, baseContribution);
 
@@ -351,14 +321,16 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
           }
         }
 
+        const monthlyGrowthRate = getAnnualGrowthRateForDate(config, stepDate) / 12;
         projectionValue = projectionValue * (1 + monthlyGrowthRate) + contribution;
       }
 
-      const requiredAtPlanned = calculateRequiredMonthlyContributionRaw(
+      const requiredAtPlanned = calculateRequiredMonthlyContributionForDatesRaw(
         projectionValue,
         investmentGoal,
-        annualGrowthRate,
-        monthsRemainingAtPlannedUntil
+        config,
+        plannedUntilDate,
+        lastDate
       );
 
       return {
@@ -371,7 +343,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       };
     }).filter((scenario) => Number.isFinite(scenario.y));
   }, [
-    config.annual_growth_rate,
+    config,
     config.investment_goal,
     config.planned_monthly_contribution,
     fullDataSet,

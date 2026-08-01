@@ -119,7 +119,8 @@ describe('financial-utils', () => {
       ];
       const config = {
         investment_goal: '1300', // Goal close to current for easy math
-        annual_growth_rate: '0',  // Zero growth to hit linear branch
+        annual_growth_rate_near_term: '0',  // Zero growth to hit linear branch
+        annual_growth_rate_long_term: '0',
       };
 
       const result = calculateTargetWithFixedContribution(events as any, config);
@@ -143,7 +144,8 @@ describe('financial-utils', () => {
       ];
       const config = {
         investment_goal: '1600',
-        annual_growth_rate: '0',
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
       };
 
       const result = calculateTargetWithFixedContribution(events as any, config);
@@ -171,7 +173,8 @@ describe('financial-utils', () => {
 
       const config = {
         investment_goal: '1000000',
-        annual_growth_rate: '0.07',
+        annual_growth_rate_near_term: '0.07',
+        annual_growth_rate_long_term: '0.07',
       };
 
       const result = calculateTargetWithFixedContribution(events as any, config);
@@ -205,7 +208,8 @@ describe('financial-utils', () => {
       ];
       const config = {
         investment_goal: '260',
-        annual_growth_rate: '0',
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
       };
 
       const result = calculateTargetWithFixedContribution(events as any, config);
@@ -224,7 +228,8 @@ describe('financial-utils', () => {
       ];
       const config = {
         investment_goal: '120',
-        annual_growth_rate: '0.12',
+        annual_growth_rate_near_term: '0.12',
+        annual_growth_rate_long_term: '0.12',
       };
 
       const result = calculateTargetWithFixedContribution(events as any, config, 0.12);
@@ -262,7 +267,8 @@ describe('financial-utils', () => {
       ];
       const config = {
         investment_goal: '1000',
-        annual_growth_rate: '0',
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
         planned_monthly_contribution: '50',
       };
 
@@ -282,7 +288,8 @@ describe('financial-utils', () => {
       ];
       const config = {
         investment_goal: '1000',
-        annual_growth_rate: '0.12',
+        annual_growth_rate_near_term: '0.12',
+        annual_growth_rate_long_term: '0.12',
         planned_monthly_contributions_until: '2024-02-15',
       };
 
@@ -292,6 +299,61 @@ describe('financial-utils', () => {
       expect(result[1].growthOnlyGoalLine).toBeCloseTo(1000 / Math.pow(1.01, 2), 6);
       expect(result[2].growthOnlyGoalLine).toBeCloseTo(1000 / 1.01, 6);
       expect(result[3].growthOnlyGoalLine).toBeCloseTo(1000, 6);
+    });
+
+    it('switches every configured-rate projection from near-term to long-term growth at the cutoff', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-01'), stocks_in_eur: '100' },
+        { date: new Date('2024-02-01') },
+        { date: new Date('2024-03-01') },
+        { date: new Date('2024-04-01') },
+      ];
+      const config = {
+        investment_goal: '104',
+        annual_growth_rate_near_term: '0.12',
+        annual_growth_rate_long_term: '0',
+        planned_monthly_contributions_until: '2024-02-01',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      expect(result[0].minRequiredContribution).toBeCloseTo(1, 6);
+      expect(result.map((point) => point.targetWithMinimumContribution)).toEqual([
+        100,
+        102,
+        103,
+        104,
+      ]);
+      expect(result.map((point) => point.targetWithFixedContribution)).toEqual([
+        100,
+        102,
+        103,
+        104,
+      ]);
+      expect(result[1].growthOnlyGoalLine).toBeCloseTo(104, 6);
+      expect(result[3].growthOnlyGoalLine).toBeCloseTo(104, 6);
+    });
+
+    it('keeps near-term growth and planned contributions active for the entire cutoff month', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-31'), stocks_in_eur: '100' },
+        { date: new Date('2024-02-29') },
+        { date: new Date('2024-03-31') },
+      ];
+      const config = {
+        investment_goal: '111',
+        annual_growth_rate_near_term: '0.12',
+        annual_growth_rate_long_term: '0',
+        planned_monthly_contribution: '10',
+        planned_monthly_contributions_until: '2024-02-01',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      // February 29 is still in the cutoff month: 1% growth plus the planned 10 EUR.
+      expect(result[1].plannedContributionLine).toBeCloseTo(111, 6);
+      // Long-term growth and no planned contribution begin in March.
+      expect(result[2].plannedContributionLine).toBeCloseTo(111, 6);
     });
   });
 
