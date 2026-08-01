@@ -43,6 +43,7 @@ export interface ChartDataPoint {
   lineWithPlusOnePercentGrowth?: number | null;
   lineWithTrendGrowth?: number | null;
   lineWithTrendGrowthAndPlannedContribution?: number | null;
+  growthOnlyGoalLine?: number | null;
   plannedContributionLine?: number | null;
   plannedMinRequiredContribution?: number | null;
   expectedMinRequiredContribution?: number | null;

@@ -272,6 +272,27 @@ describe('financial-utils', () => {
       expect(result[1].plannedContributionLine).toBeCloseTo(150, 6);
       expect(result[2].plannedContributionLine).toBeCloseTo(200, 6);
     });
+
+    it('projects the growth-only goal path from the planned contribution cutoff', () => {
+      const events: Event[] = [
+        { date: new Date('2024-01-01'), stocks_in_eur: '100' },
+        { date: new Date('2024-02-01') },
+        { date: new Date('2024-03-01') },
+        { date: new Date('2024-04-01') },
+      ];
+      const config = {
+        investment_goal: '1000',
+        annual_growth_rate: '0.12',
+        planned_monthly_contributions_until: '2024-02-15',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config);
+
+      expect(result[0].growthOnlyGoalLine).toBeNull();
+      expect(result[1].growthOnlyGoalLine).toBeCloseTo(1000 / Math.pow(1.01, 2), 6);
+      expect(result[2].growthOnlyGoalLine).toBeCloseTo(1000 / 1.01, 6);
+      expect(result[3].growthOnlyGoalLine).toBeCloseTo(1000, 6);
+    });
   });
 
   describe('calculateExponentialTrend', () => {

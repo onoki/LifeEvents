@@ -31,6 +31,7 @@ export function StockChart({
       'targetWithMinimumContribution',
       'lineWithTrendGrowth',
       'lineWithTrendGrowthAndPlannedContribution',
+      'growthOnlyGoalLine',
       'lineWithMinusOnePercentGrowth',
       'stocks_in_eur',
       'stocks_in_eur_adjusted_for_eunl_trend',
@@ -116,8 +117,8 @@ export function StockChart({
   const plannedContributionAmount = config.planned_monthly_contribution;
   const plannedContributionUntil = config.planned_monthly_contributions_until;
   const plannedContributionDescription = isPrivacyMode
-    ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions.'
-    : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
+    ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions. Then assume min contributions from then on.'
+    : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions. Then assume min contributions from then on.`;
   const legendItems = React.useMemo<LegendItem[]>(() => ([
     {
       label: 'Percentage (left Y axis)',
@@ -158,7 +159,7 @@ export function StockChart({
     },
     {
       label: 'Growth scenario (average index trend)',
-      description: 'Scenario based on the average historical trend growth across the four indexes.',
+      description: 'Scenario based on the average historical trend growth across the four indexes. Assumes minimum contributiosn.',
       color: '#06b6d4',
       strokeDasharray: '5 5',
       variant: 'line',
@@ -176,6 +177,13 @@ export function StockChart({
       label: 'Planned contributions path',
       description: plannedContributionDescription,
       color: '#f59e0b',
+      variant: 'line'
+    },
+    {
+      label: 'Goal path from cutoff (growth only)',
+      description: 'Required investment value at the planned-contribution cutoff, followed by annual growth with no further contributions through the investment goal date.',
+      color: '#fde68a',
+      strokeDasharray: '4 6',
       variant: 'line'
     }
   ]), [isSimplified, plannedContributionDescription]);
@@ -224,6 +232,22 @@ export function StockChart({
       y: latestWithAdjusted.stocks_in_eur_adjusted_for_eunl_trend as number
     };
   }, [data]);
+  const growthOnlyGoalStart = React.useMemo(() => {
+    if (!config.planned_monthly_contributions_until) return null;
+    const plannedUntilDate = new Date(config.planned_monthly_contributions_until);
+    if (Number.isNaN(plannedUntilDate.getTime())) return null;
+    const firstPoint = data.find((item) =>
+      item.date.getFullYear() === plannedUntilDate.getFullYear()
+      && item.date.getMonth() === plannedUntilDate.getMonth()
+      && typeof item.growthOnlyGoalLine === 'number'
+      && Number.isFinite(item.growthOnlyGoalLine)
+    );
+    if (!firstPoint || typeof firstPoint.growthOnlyGoalLine !== 'number') return null;
+    return {
+      x: firstPoint.dateFormatted,
+      y: firstPoint.growthOnlyGoalLine
+    };
+  }, [config.planned_monthly_contributions_until, data]);
   
   return (
     <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
@@ -293,6 +317,7 @@ export function StockChart({
                              name === 'lineWithPlusOnePercentGrowth' ? `${Math.round((annualGrowthRate + 0.01) * 100)} % growth scenario` :
                              name === 'lineWithTrendGrowth' ? trendGrowthLabel :
                              name === 'lineWithTrendGrowthAndPlannedContribution' ? trendGrowthWithPlannedLabel :
+                             name === 'growthOnlyGoalLine' ? 'Goal path from cutoff (growth only)' :
                              'Unknown';
                 return [formatCurrency(value as number), label];
               }}
@@ -354,6 +379,28 @@ export function StockChart({
             activeDot={{ r: 3, fill: '#06b6d4' }}
             hide={isSimplified || data.every(item => item.lineWithTrendGrowthAndPlannedContribution == null)}
           />
+          <Line
+            type="monotone"
+            dataKey="growthOnlyGoalLine"
+            stroke="#fde68a"
+            strokeOpacity={0.75}
+            strokeWidth={1.5}
+            strokeDasharray="4 6"
+            dot={false}
+            activeDot={{ r: 3, fill: '#facc15' }}
+            connectNulls={false}
+            hide={data.every(item => item.growthOnlyGoalLine == null)}
+          />
+          {growthOnlyGoalStart !== null && isWithinRightAxisDomain(growthOnlyGoalStart.y) && (
+            <ReferenceDot
+              x={growthOnlyGoalStart.x}
+              y={growthOnlyGoalStart.y}
+              r={6}
+              fill="#facc15"
+              stroke="#fff7cc"
+              strokeWidth={2}
+            />
+          )}
           {milestoneMarkers
             .filter((marker) => isWithinRightAxisDomain(marker.y))
             .map((marker) => {

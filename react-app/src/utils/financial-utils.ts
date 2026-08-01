@@ -156,6 +156,14 @@ export function calculateTargetWithFixedContribution(
     const contributesThisMonth = shouldApplyPlannedContribution(item.date);
     const isLatestDataPoint = index === latestDataPointIndex;
     const isFuturePoint = index > latestDataPointIndex;
+
+    // Capital required at/after the planned-contribution cutoff for growth alone
+    // to reach the investment goal at the end of the shared chart horizon.
+    const isAtOrAfterPlannedUntil = hasValidPlannedUntil
+      && monthsBetween(plannedUntilDate!, item.date) >= 0;
+    const growthOnlyGoalLine = isAtOrAfterPlannedUntil
+      ? investmentGoal / pow1p(monthlyGrowthRate, monthsRemaining)
+      : null;
     
     // Calculate target value with fixed contribution
     const targetValue = firstAdjustedValue * pow1p(monthlyGrowthRate, monthsFromStart) + 
@@ -337,6 +345,9 @@ export function calculateTargetWithFixedContribution(
       lineWithTrendGrowth: lineWithTrendGrowth ? Math.max(0, lineWithTrendGrowth) : null,
       lineWithTrendGrowthAndPlannedContribution: lineWithTrendGrowthAndPlannedContribution
         ? Math.max(0, lineWithTrendGrowthAndPlannedContribution)
+        : null,
+      growthOnlyGoalLine: growthOnlyGoalLine !== null && Number.isFinite(growthOnlyGoalLine)
+        ? Math.max(0, growthOnlyGoalLine)
         : null,
       targetWithMinimumContribution: targetWithMinimumContribution ? Math.max(0, targetWithMinimumContribution) : null,
       plannedContributionLine: plannedContributionLine !== null ? Math.max(0, plannedContributionLine) : null,

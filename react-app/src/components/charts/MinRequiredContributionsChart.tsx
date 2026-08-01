@@ -389,7 +389,21 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
     });
   }, [scenarioResults]);
 
-  const rightAxisDomain = baseRightAxisDomain;
+  const rightAxisDomain = React.useMemo(() => {
+    if (orderedScenarioResults.length === 0) return baseRightAxisDomain;
+
+    const markerValues = orderedScenarioResults
+      .map((scenario) => scenario.y)
+      .filter((value) => Number.isFinite(value));
+    if (markerValues.length === 0) return baseRightAxisDomain;
+
+    const min = Math.min(baseRightAxisDomain[0], ...markerValues);
+    const max = Math.max(baseRightAxisDomain[1], ...markerValues);
+    const span = max - min;
+    // Leave room for the marker circles and their labels at either edge.
+    const padding = Math.max(span * 0.04, Math.max(Math.abs(min), Math.abs(max)) * 0.01, 1);
+    return [min - padding, max + padding] as [number, number];
+  }, [baseRightAxisDomain, orderedScenarioResults]);
   const progressAxis = React.useMemo(() => {
     const firstValue = chartData.length > 0 ? chartData[0]?.minRequiredContribution : null;
     if (typeof firstValue !== 'number' || !Number.isFinite(firstValue) || firstValue <= 0) {
