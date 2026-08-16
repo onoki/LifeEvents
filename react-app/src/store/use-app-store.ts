@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { Event, Config, Condition, IndexDataPoint, MiniReward, TrendStats } from '../types';
 import { parseExternalJson, type JsonPayloadValidator } from '../utils/external-api-utils';
+import { fetchConfiguredIndexApi, type IndexApiSeries } from '../utils/index-api-utils';
+import { fetchTsvText } from '../utils/sheet-data-utils';
 
 interface AppState {
   // Data state
@@ -82,13 +84,7 @@ export const useAppStore = create<AppState>()(
         set({ loading: true, error: null, indexError: null, status: 'Fetching data from Google Sheets...' });
 
         try {
-          const response = await fetch(url);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          const tsvData = await response.text();
+          const tsvData = await fetchTsvText(url);
           const { config: parsedConfig, conditions: parsedConditions, data: parsedData, miniRewards: parsedMiniRewards } = parseTSVData(tsvData);
           
           if (parsedData.length === 0) {
@@ -142,6 +138,37 @@ export const useAppStore = create<AppState>()(
         });
 
         try {
+          const configuredIndexApiUrl = import.meta.env.VITE_INDEX_API_URL?.trim();
+          const configuredSeriesBySymbol = new Map<string, IndexApiSeries>();
+          const configuredApiErrorsBySymbol = new Map<string, string>();
+
+          // This endpoint is optional by design. Leaving the variable unset skips
+          // it entirely, and every failure below falls through to the established
+          // provider/direct/public-proxy implementation later in this action.
+          if (configuredIndexApiUrl) {
+            set({ status: 'Fetching indexes through the configured Vercel endpoint...' });
+            try {
+              const response = await fetchConfiguredIndexApi({
+                endpoint: configuredIndexApiUrl,
+                requestedSymbol: symbol ?? 'all',
+                expectedSymbols: fetchScopeSymbols,
+                timeoutMs: APP_CONFIG.API.REQUEST_TIMEOUT_MS,
+              });
+              response.series.forEach((series) => {
+                configuredSeriesBySymbol.set(series.symbol, series);
+              });
+              response.errors.forEach((error) => {
+                configuredApiErrorsBySymbol.set(error.symbol, error.error);
+              });
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : APP_CONFIG.ERRORS.FETCH_FAILED;
+              fetchScopeSymbols.forEach((targetSymbol) => {
+                configuredApiErrorsBySymbol.set(targetSymbol, errorMessage);
+              });
+              console.warn('Configured index API unavailable; using the existing index-fetch fallback.', error);
+            }
+          }
+
           type IndexDefinition = (typeof APP_CONFIG.API.INDEX_SERIES)[number];
           type YahooChartResponse = {
             chart?: {
@@ -839,7 +866,10 @@ export const useAppStore = create<AppState>()(
           };
 
           let morningstarToken: string | null = null;
-          const morningstarNeeded = indexDefinitionsToFetch.some((indexDefinition) => indexDefinition.source === 'morningstar');
+          const morningstarNeeded = indexDefinitionsToFetch.some((indexDefinition) => (
+            indexDefinition.source === 'morningstar'
+            && !configuredSeriesBySymbol.has(indexDefinition.symbol)
+          ));
 
           if (morningstarNeeded) {
             set({ status: 'Fetching Morningstar auth token...' });
@@ -856,8 +886,25 @@ export const useAppStore = create<AppState>()(
               set({ status: `Fetching ${indexDefinition.symbol} index data...` });
               let points: IndexDataPoint[] = [];
               let sourceName = 'direct';
+              const configuredSeries = configuredSeriesBySymbol.get(indexDefinition.symbol);
 
-              if (indexDefinition.source === 'yahoo') {
+              if (configuredSeries) {
+                points = configuredSeries.points
+                  .map((point): IndexDataPoint => {
+                    const parsedDate = new Date(`${point.date}T00:00:00.000Z`);
+                    return {
+                      date: parsedDate,
+                      value: point.value,
+                      dateFormatted: parsedDate.toLocaleDateString('en-US', {
+                        ...APP_CONFIG.DATA.DATE_FORMAT_OPTIONS_WITH_DAY,
+                        timeZone: 'UTC',
+                      }),
+                    };
+                  })
+                  .sort((left, right) => left.date.getTime() - right.date.getTime());
+                sourceName = `Vercel (${configuredSeries.source})`;
+              } else if (indexDefinition.source === 'yahoo') {
+                // Keep the existing implementation as the operational fallback.
                 const result = await fetchYahooIndex(indexDefinition);
                 points = result.points;
                 sourceName = result.sourceName;
@@ -892,7 +939,12 @@ export const useAppStore = create<AppState>()(
               publishIndexDataProgress(`Loaded ${indexDefinition.symbol} (${points.length} points) via ${sourceName}`);
             } catch (err) {
               const errorMessage = err instanceof Error ? err.message : APP_CONFIG.ERRORS.FETCH_FAILED;
-              loadErrors.push(`${indexDefinition.symbol}: ${errorMessage}`);
+              const configuredApiError = configuredApiErrorsBySymbol.get(indexDefinition.symbol);
+              loadErrors.push(
+                `${indexDefinition.symbol}: ${configuredApiError
+                  ? `Vercel: ${configuredApiError}; fallback: ${errorMessage}`
+                  : errorMessage}`
+              );
               console.error(`Failed to load index data for ${indexDefinition.symbol}:`, err);
               publishIndexDataProgress(`Failed ${indexDefinition.symbol}; continuing...`);
             }

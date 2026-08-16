@@ -14,9 +14,20 @@ const stripSetCookieHeader = (proxy) => {
   })
 }
 
+// @vitejs/plugin-react injects an inline Fast Refresh preamble only while the
+// development server is running. Keep the production CSP strict and loosen
+// script elements solely in that local development response.
+const allowViteReactRefreshInDevelopment = {
+  name: 'allow-vite-react-refresh-in-development',
+  apply: 'serve',
+  transformIndexHtml(html) {
+    return html.replace("script-src 'self';", "script-src 'self' 'unsafe-inline';")
+  },
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), allowViteReactRefreshInDevelopment],
   base: '/LifeEvents/',
   server: {
     proxy: {

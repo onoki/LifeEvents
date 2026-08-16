@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom';
+import { TextDecoder, TextEncoder } from 'node:util';
+
+// jsdom does not currently expose the Encoding API that browsers provide.
+Object.defineProperty(globalThis, 'TextEncoder', { value: TextEncoder });
+Object.defineProperty(globalThis, 'TextDecoder', { value: TextDecoder });
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

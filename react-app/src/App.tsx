@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useAppStore } from './store/use-app-store'
 import { usePrivacyMode } from './hooks/use-privacy-mode'
 import { APP_CONFIG } from './config/app-config'
+import { getSheetsUrlFromSearch } from './utils/sheet-data-utils'
 import './styles/accessibility.css'
 import type { ViewMode } from './types'
 
@@ -32,13 +33,13 @@ function App(): React.JSX.Element {
 
   // Load URL from GET parameter on component mount
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const sheetsParam = urlParams.get('sheets')
+    const sheetsParam = getSheetsUrlFromSearch(window.location.search)
     
     if (sheetsParam) {
-      const decodedUrl = decodeURIComponent(sheetsParam)
-      setSheetsUrl(decodedUrl)
-      loadData(decodedUrl)
+      // URLSearchParams already decodes parameter values once. Decoding again
+      // can corrupt legitimate percent-encoded URLs or throw on a literal `%`.
+      setSheetsUrl(sheetsParam)
+      loadData(sheetsParam)
     }
   }, [])
 
