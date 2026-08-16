@@ -1,8 +1,10 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useKPICalculations } from '../../hooks/use-kpi-calculations';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { formatPercentage } from '../../utils/financial-utils';
-import { countWorkdays } from '../../utils/date-utils';
+import { countWorkdays, parseLocalCalendarDate } from '../../utils/date-utils';
+import { PRIVACY_DATE_MASK, PRIVACY_RATE_MASK, PRIVACY_VALUE_MASK } from '../../utils/privacy-utils';
 import type { Config } from '../../types';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -41,8 +43,9 @@ interface FocusedSavingsCardProps {
  */
 export function FocusedSavingsCard({ config }: FocusedSavingsCardProps): React.JSX.Element {
   const { currentTime } = useKPICalculations();
+  const { isPrivacyMode } = usePrivacyMode();
   const plannedUntil = config.planned_monthly_contributions_until;
-  const targetDate = plannedUntil ? new Date(plannedUntil) : null;
+  const targetDate = plannedUntil ? parseLocalCalendarDate(plannedUntil) : null;
   const hasTargetDate = Boolean(targetDate && !Number.isNaN(targetDate.getTime()));
   const focusedSavingsStart = FOCUSED_SAVINGS_START;
   const isBeforeStart = currentTime.getTime() < focusedSavingsStart.getTime();
@@ -85,14 +88,18 @@ export function FocusedSavingsCard({ config }: FocusedSavingsCardProps): React.J
               </svg>
             </div>
             <div>
-              <div className="text-2xl font-bold">{timeRemaining}</div>
+              <div className="text-2xl font-bold">
+                {isPrivacyMode ? PRIVACY_VALUE_MASK : timeRemaining}
+              </div>
               <div className="text-base font-medium text-gray-500">
-                {workdaysRemaining.toLocaleString('en-US').replace(/,/g, ' ')} workdays
+                {isPrivacyMode
+                  ? `${PRIVACY_VALUE_MASK} workdays`
+                  : `${workdaysRemaining.toLocaleString('en-US').replace(/,/g, ' ')} workdays`}
               </div>
             </div>
           </div>
           <div className="text-base font-semibold text-gray-600">
-            {formatPercentage(progress, 2)}
+            {isPrivacyMode ? PRIVACY_RATE_MASK : formatPercentage(progress, 2)}
           </div>
         </div>
         <div className="mt-auto pt-2">
@@ -103,8 +110,8 @@ export function FocusedSavingsCard({ config }: FocusedSavingsCardProps): React.J
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2 mb-1">
-            <span>{startLabel}</span>
-            <span>{endLabel}</span>
+            <span>{isPrivacyMode ? PRIVACY_DATE_MASK : startLabel}</span>
+            <span>{isPrivacyMode ? PRIVACY_DATE_MASK : endLabel}</span>
           </div>
         </div>
       </CardContent>

@@ -97,3 +97,8 @@ Default values, dates, and API endpoints live in `react-app/src/config/app-confi
 ## Privacy mode
 
 Append `?privacy=true` to hide sensitive values in the UI.
+
+Privacy mode is a project-wide UI requirement: exact monetary amounts, dates,
+and configured or fetched growth rates must be masked in descriptive UI such as
+legends, tooltips, annotations, and summaries. Project invariants for future
+changes are recorded in `AGENTS.md`.

@@ -11,6 +11,7 @@ import {
 } from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
 import { APP_CONFIG } from '../../config/app-config';
+import { PRIVACY_RATE_MASK, PRIVACY_VALUE_MASK } from '../../utils/privacy-utils';
 import type { Config, Event, MiniReward } from '../../types';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -194,7 +195,12 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
   const progressWithinSegment = segmentRange <= 0
     ? 100
     : Math.min(100, Math.max(0, ((currentPercentRaw - progressSegmentFloor) / segmentRange) * 100));
-  const rewardsLabel = isPrivacyMode ? '••••' : `${untakenRewards} untaken rewards`;
+  const daysDisplayLabel = isPrivacyMode && daysToNextPercent !== null
+    ? `${PRIVACY_VALUE_MASK} d`
+    : daysLabel;
+  const rewardsLabel = isPrivacyMode
+    ? `${PRIVACY_VALUE_MASK} untaken rewards`
+    : `${untakenRewards} untaken rewards`;
 
   return (
     <Card className="border-gray-600">
@@ -218,11 +224,11 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
               </svg>
             </div>
             <div>
-              <div className="text-2xl font-bold">{daysLabel}</div>
+              <div className="text-2xl font-bold">{daysDisplayLabel}</div>
             </div>
           </div>
           <div className="text-base font-semibold text-gray-600">
-            {formatPercentage(currentPercent, 2)}
+            {isPrivacyMode ? PRIVACY_RATE_MASK : formatPercentage(currentPercent, 2)}
           </div>
         </div>
         <div className="mt-auto pt-2">
@@ -233,9 +239,9 @@ export function MiniRewardsCard({ data, config, miniRewards }: MiniRewardsCardPr
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2 mb-1">
-            <span>{progressSegmentFloor} %</span>
+            <span>{isPrivacyMode ? PRIVACY_RATE_MASK : `${progressSegmentFloor} %`}</span>
             <span>{rewardsLabel}</span>
-            <span>{progressSegmentCeil} %</span>
+            <span>{isPrivacyMode ? PRIVACY_RATE_MASK : `${progressSegmentCeil} %`}</span>
           </div>
         </div>
       </CardContent>

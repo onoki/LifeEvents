@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+
+const isPrivacyEnabledInUrl = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('privacy') === 'true';
+};
 
 /**
  * Hook to manage privacy mode based on URL parameter
  */
 export function usePrivacyMode() {
-  const [isPrivacyMode, setIsPrivacyMode] = useState(false);
-
-  useEffect(() => {
-    // Check for privacy parameter in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const privacyParam = urlParams.get('privacy');
-    setIsPrivacyMode(privacyParam === 'true');
-  }, []);
+  // Read the URL during the initial render so private values never appear for a
+  // frame before an effect has a chance to enable privacy mode.
+  const [isPrivacyMode, setIsPrivacyMode] = useState(isPrivacyEnabledInUrl);
 
   const togglePrivacyMode = () => {
     const newPrivacyMode = !isPrivacyMode;

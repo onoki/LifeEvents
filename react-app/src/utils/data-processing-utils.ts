@@ -1,6 +1,7 @@
 import type { Event, Condition, Config, ViewMode, ChartDataPoint, MilestoneMarker, MiniReward } from '../types';
 import { APP_CONFIG } from '../config/app-config';
 import { parseNumeric } from './number-utils';
+import { parseLocalCalendarDate } from './date-utils';
 
 /**
  * Process and normalize event data
@@ -11,7 +12,7 @@ export function processEventData(event: Record<string, string>): Event {
   } as unknown as Event;
 
   if (event.date) {
-    normalized.date = new Date(event.date);
+    normalized.date = parseLocalCalendarDate(event.date);
   }
 
   if (event.stocks_in_eur) {

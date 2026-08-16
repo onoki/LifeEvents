@@ -1,8 +1,10 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useKPICalculations } from '../../hooks/use-kpi-calculations';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { formatPercentage } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
+import { PRIVACY_RATE_MASK, PRIVACY_VALUE_MASK } from '../../utils/privacy-utils';
 
 /**
  * Work Progress Card Component
@@ -10,6 +12,7 @@ import { APP_CONFIG } from '../../config/app-config';
  */
 export function WorkProgressCard(): React.JSX.Element {
   const { workTimeFormatted, workProgress } = useKPICalculations();
+  const { isPrivacyMode } = usePrivacyMode();
 
   return (
     <Card className="border-gray-600">
@@ -22,10 +25,12 @@ export function WorkProgressCard(): React.JSX.Element {
                 <polyline points="12,6 12,12 16,14"/>
               </svg>
             </div>
-            <div className="text-2xl font-bold">{workTimeFormatted}</div>
+            <div className="text-2xl font-bold">
+              {isPrivacyMode ? PRIVACY_VALUE_MASK : workTimeFormatted}
+            </div>
           </div>
           <div className="text-base font-semibold text-gray-600">
-            {formatPercentage(workProgress, 2)}
+            {isPrivacyMode ? PRIVACY_RATE_MASK : formatPercentage(workProgress, 2)}
           </div>
         </div>
         <div className="mt-auto pt-2">
@@ -36,8 +41,16 @@ export function WorkProgressCard(): React.JSX.Element {
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2 mb-1">
-            <span>{APP_CONFIG.WORK_SCHEDULE.START_HOUR}:{APP_CONFIG.WORK_SCHEDULE.START_MINUTE.toString().padStart(2, '0')}</span>
-            <span>{APP_CONFIG.WORK_SCHEDULE.END_HOUR}:{APP_CONFIG.WORK_SCHEDULE.END_MINUTE.toString().padStart(2, '0')}</span>
+            <span>
+              {isPrivacyMode
+                ? PRIVACY_VALUE_MASK
+                : `${APP_CONFIG.WORK_SCHEDULE.START_HOUR}:${APP_CONFIG.WORK_SCHEDULE.START_MINUTE.toString().padStart(2, '0')}`}
+            </span>
+            <span>
+              {isPrivacyMode
+                ? PRIVACY_VALUE_MASK
+                : `${APP_CONFIG.WORK_SCHEDULE.END_HOUR}:${APP_CONFIG.WORK_SCHEDULE.END_MINUTE.toString().padStart(2, '0')}`}
+            </span>
           </div>
         </div>
       </CardContent>

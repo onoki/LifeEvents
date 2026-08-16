@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { Event, Config, Condition, IndexDataPoint, MiniReward, TrendStats } from '../types';
+import { parseExternalJson, type JsonPayloadValidator } from '../utils/external-api-utils';
 
 interface AppState {
   // Data state
@@ -168,16 +169,55 @@ export const useAppStore = create<AppState>()(
             series?: MorningstarSeriesPoint[];
           }>;
 
+          const isYahooChartResponse = (data: unknown): data is YahooChartResponse => {
+            if (!data || typeof data !== 'object') {
+              return false;
+            }
+
+            const chart = (data as YahooChartResponse).chart;
+            return Array.isArray(chart?.result)
+              && chart.result.some((result) => (
+                Array.isArray(result.timestamp)
+                && Array.isArray(result.indicators?.quote?.[0]?.close)
+              ));
+          };
+
+          const getMorningstarSeries = (data: unknown): MorningstarSeriesPoint[] | null => {
+            if (!Array.isArray(data)) {
+              return null;
+            }
+
+            for (const item of data) {
+              if (item && typeof item === 'object') {
+                const series = (item as { series?: unknown }).series;
+                if (Array.isArray(series)) {
+                  return series as MorningstarSeriesPoint[];
+                }
+              }
+            }
+
+            return null;
+          };
+
+          const isMorningstarResponse = (data: unknown): data is MorningstarResponse => (
+            getMorningstarSeries(data)?.some((point) => (
+              typeof point?.date === 'string'
+              && typeof point.close === 'number'
+              && Number.isFinite(point.close)
+            )) === true
+          );
+
           const buildSameOriginUrl = (pathWithQuery: string): string => {
             const normalizedPath = pathWithQuery.startsWith('/') ? pathWithQuery : `/${pathWithQuery}`;
             return new URL(normalizedPath, window.location.origin).toString();
           };
 
-          // Default to production-like networking even in dev so GitHub Pages behavior
-          // can be validated locally. Opt in to Vite same-origin proxies only when
-          // VITE_USE_DEV_SAME_ORIGIN_PROXY=true.
+          // Vite already provides same-origin proxy routes in development. Use them
+          // by default so Morningstar's authorization header is not entrusted to a
+          // public CORS proxy. Set VITE_USE_DEV_SAME_ORIGIN_PROXY=false only when
+          // intentionally testing production-like networking locally.
           const useSameOriginProxy = import.meta.env.DEV
-            && import.meta.env.VITE_USE_DEV_SAME_ORIGIN_PROXY === 'true';
+            && import.meta.env.VITE_USE_DEV_SAME_ORIGIN_PROXY !== 'false';
 
           const toPathAndQuery = (url: string): string => {
             const parsed = new URL(url);
@@ -295,6 +335,7 @@ export const useAppStore = create<AppState>()(
               includeDirect?: boolean;
               includeExternalProxies?: boolean;
               requestInit?: RequestInit;
+              validate?: JsonPayloadValidator<T>;
             }
           ): Promise<{ data: T; sourceName: string }> => {
             const {
@@ -304,46 +345,9 @@ export const useAppStore = create<AppState>()(
               includeDirect = false,
               includeExternalProxies = true,
               requestInit,
+              validate,
             } = options;
             const sourceErrors: string[] = [];
-            const parseJsonPayload = (raw: string): T => {
-              const trimmed = raw.trim();
-              if (!trimmed) {
-                throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
-              }
-
-              const candidates: string[] = [trimmed];
-
-              // Some proxies prepend XSSI guards.
-              if (trimmed.startsWith(")]}'")) {
-                candidates.push(trimmed.replace(/^\)\]\}'\s*/, ''));
-              }
-
-              // Some proxies wrap payloads in a JSON envelope.
-              if (trimmed.startsWith('{')) {
-                try {
-                  const parsedEnvelope = JSON.parse(trimmed) as { contents?: unknown; data?: unknown };
-                  if (typeof parsedEnvelope.contents === 'string') {
-                    candidates.push(parsedEnvelope.contents.trim());
-                  }
-                  if (typeof parsedEnvelope.data === 'string') {
-                    candidates.push(parsedEnvelope.data.trim());
-                  }
-                } catch {
-                  // ignore envelope parse failure and continue with raw candidates
-                }
-              }
-
-              for (const candidate of candidates) {
-                try {
-                  return JSON.parse(candidate) as T;
-                } catch {
-                  // try next candidate
-                }
-              }
-
-              throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
-            };
 
             for (const source of createSourceUrls({
               targetUrl,
@@ -363,9 +367,14 @@ export const useAppStore = create<AppState>()(
                 }
 
                 const rawText = await response.text();
+                const data = parseExternalJson(
+                  rawText,
+                  APP_CONFIG.ERRORS.INVALID_DATA_FORMAT,
+                  validate
+                );
                 rememberPreferredExternalProxy(source.proxyUrl);
                 return {
-                  data: parseJsonPayload(rawText),
+                  data,
                   sourceName: source.sourceName,
                 };
               } catch (err) {
@@ -604,6 +613,7 @@ export const useAppStore = create<AppState>()(
                 sameOriginUrl: yahooSameOriginUrl,
                 includeDirect: false,
                 includeExternalProxies: true,
+                validate: isYahooChartResponse,
                 requestInit: {
                   cache: 'no-store',
                 },
@@ -739,12 +749,13 @@ export const useAppStore = create<AppState>()(
                   },
               includeDirect: true,
               includeExternalProxies: !useSameOriginProxy,
+              validate: isMorningstarResponse,
               requestInit: {
                 cache: 'no-store',
               },
             });
 
-            const series = data?.[0]?.series;
+            const series = getMorningstarSeries(data);
             if (!series || !Array.isArray(series)) {
               throw new Error(APP_CONFIG.ERRORS.INVALID_DATA_FORMAT);
             }

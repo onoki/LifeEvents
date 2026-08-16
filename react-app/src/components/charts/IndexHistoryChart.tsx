@@ -322,19 +322,14 @@ export function IndexHistoryChart({
   const legendItems = React.useMemo(() => {
     return [
       ...seriesConfigs.map((config) => ({
-        label: `${config.shortLabel} value`,
-        description: config.displayName,
+        label: config.shortLabel,
+        description: `${config.displayName}. Solid: index value; dashed: trend; dotted: ±1 σ.`,
         color: config.color,
         variant: 'line' as const,
       })),
       {
         label: 'Normalized scale (0 to 100 %)',
         description: 'Each index is scaled from its own minimum to maximum values for easier comparison.',
-        variant: 'note' as const,
-      },
-      {
-        label: 'Trend / +/-1 σ',
-        description: 'Dashed lines show trend and one standard deviation band per index.',
         variant: 'note' as const,
       },
       {
@@ -505,13 +500,13 @@ export function IndexHistoryChart({
                           <div key={`tooltip-${config.symbol}`} className="rounded border border-border/50 p-2">
                             <div className="font-semibold" style={{ color: config.color }}>{config.shortLabel}</div>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm">
-                              <span className="text-muted-foreground">Range position:</span>
+                              <span className="text-muted-foreground">Position:</span>
                               <span className="text-right">{typeof normalizedValue === 'number' ? formatPercent(normalizedValue) : 'N/A'}</span>
                               <span className="text-muted-foreground">Value:</span>
                               <span className="text-right">{formatValue(value)}</span>
                               <span className="text-muted-foreground">Trend:</span>
                               <span className="text-right">{typeof trend === 'number' ? formatValue(trend) : 'N/A'}</span>
-                              <span className="text-muted-foreground">+1 σ / -1 σ:</span>
+                              <span className="text-muted-foreground">±1 σ:</span>
                               <span className="text-right">
                                 {typeof upper === 'number' && typeof lower === 'number'
                                   ? `${formatValue(upper)} / ${formatValue(lower)}`

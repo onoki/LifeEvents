@@ -1,5 +1,36 @@
 import { APP_CONFIG } from '../config/app-config';
 
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parse an ISO date-only value as a local calendar date.
+ *
+ * JavaScript treats `YYYY-MM-DD` as UTC, which can move the date into the
+ * previous local month in time zones west of UTC. Configuration and event
+ * dates represent calendar dates, so their year/month/day must stay intact.
+ * Timestamp values retain the standard Date parsing semantics.
+ */
+export function parseLocalCalendarDate(value: string): Date {
+  const normalized = value.trim();
+  const match = DATE_ONLY_PATTERN.exec(normalized);
+  if (!match) return new Date(normalized);
+
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const parsed = new Date(year, month, day);
+
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month
+    || parsed.getDate() !== day
+  ) {
+    return new Date(Number.NaN);
+  }
+
+  return parsed;
+}
+
 /**
  * Helper function to apply 16:00 transition logic
  * Only moves to the next day if it's after 16:00 AND it's a workday (Monday-Friday)

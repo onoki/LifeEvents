@@ -1,13 +1,102 @@
 import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, ReferenceDot, ReferenceLine, Label } from 'recharts';
-import type { StockChartProps, ChartDataPoint } from '../../types';
+import type { StockChartProps, ChartDataPoint, MilestoneMarker } from '../../types';
 import { formatCurrency } from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
+import {
+  formatPrivacyAwareDateTick,
+  PRIVACY_DATE_MASK,
+  PRIVACY_RATE_MASK,
+  PRIVACY_VALUE_MASK
+} from '../../utils/privacy-utils';
+import { parseLocalCalendarDate } from '../../utils/date-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 import { StockValueIndicator } from './StockValueIndicator';
 import { ChartLegend } from './ChartLegend';
 import type { LegendItem } from './ChartLegend';
+
+const GROWTH_PLUS_COLOR = '#06b6d4';
+const GROWTH_MINUS_COLOR = '#67e8f9';
+const INDEX_MIN_COLOR = '#0284c7';
+const INDEX_PLANNED_COLOR = '#38bdf8';
+
+const formatAnnualRate = (rate: number): string =>
+  `${Math.round(rate * 1000) / 10} %`;
+
+const parseAnnualRate = (value: string | undefined, fallback: number): number => {
+  const parsed = parseNumeric(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const STOCK_VALUE_KEYS: Array<keyof ChartDataPoint> = [
+  'lineWithPlusOnePercentGrowth',
+  'targetWithMinimumContribution',
+  'lineWithTrendGrowth',
+  'lineWithTrendGrowthAndPlannedContribution',
+  'growthOnlyGoalLine',
+  'lineWithMinusOnePercentGrowth',
+  'stocks_in_eur',
+  'stocks_in_eur_adjusted_for_eunl_trend',
+  'plannedContributionLine',
+  'targetWithFixedContribution'
+];
+
+export interface StockChartDomainState {
+  domain: [number, number];
+  visibleMilestoneMarkers: MilestoneMarker[];
+}
+
+/**
+ * Build the Y domain from the displayed series and only those milestone markers
+ * whose categorical X value is present in the displayed data range.
+ */
+export const calculateStockChartDomain = (
+  data: ChartDataPoint[],
+  milestoneMarkers: MilestoneMarker[]
+): StockChartDomainState => {
+  const visibleXValues = new Set(data.map((item) => item.dateFormatted));
+  const visibleMilestoneMarkers = milestoneMarkers.filter((marker) =>
+    visibleXValues.has(marker.x)
+    && Number.isFinite(marker.y)
+  );
+  const values: number[] = [];
+
+  data.forEach((item) => {
+    STOCK_VALUE_KEYS.forEach((key) => {
+      const value = item[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        values.push(value);
+      }
+    });
+  });
+  visibleMilestoneMarkers.forEach((marker) => values.push(marker.y));
+
+  if (values.length === 0) {
+    return { domain: [0, 0], visibleMilestoneMarkers };
+  }
+
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (visibleMilestoneMarkers.length > 0) {
+    const span = max - min;
+    const padding = Math.max(
+      span * 0.05,
+      Math.max(Math.abs(min), Math.abs(max)) * 0.01,
+      1000
+    );
+    min -= padding;
+    max += padding;
+  }
+
+  return {
+    domain: [
+      Math.floor(min / 1000) * 1000,
+      Math.ceil(max / 1000) * 1000
+    ],
+    visibleMilestoneMarkers
+  };
+};
 
 /**
  * Stock Chart Component
@@ -25,41 +114,13 @@ export function StockChart({
 }: StockChartProps): React.JSX.Element {
   const { isPrivacyMode } = usePrivacyMode();
   const [isSimplified, setIsSimplified] = React.useState(false);
-  const rightAxisDomain = React.useMemo(() => {
-    const keys: Array<keyof ChartDataPoint> = [
-      'lineWithPlusOnePercentGrowth',
-      'targetWithMinimumContribution',
-      'lineWithTrendGrowth',
-      'lineWithTrendGrowthAndPlannedContribution',
-      'growthOnlyGoalLine',
-      'lineWithMinusOnePercentGrowth',
-      'stocks_in_eur',
-      'stocks_in_eur_adjusted_for_eunl_trend',
-      'plannedContributionLine',
-      'targetWithFixedContribution'
-    ];
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    const perKeyMax: Partial<Record<keyof ChartDataPoint, number>> = {};
-    data.forEach((item) => {
-      keys.forEach((key) => {
-        const value = item[key];
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          min = Math.min(min, value);
-          max = Math.max(max, value);
-          if (perKeyMax[key] === undefined || value > perKeyMax[key]!) {
-            perKeyMax[key] = value;
-          }
-        }
-      });
-    });
-    if (!Number.isFinite(min) || !Number.isFinite(max)) {
-      return [0, 0] as [number, number];
-    }
-    const roundedMin = Math.floor(min / 1000) * 1000;
-    const roundedMax = Math.ceil(max / 1000) * 1000;
-    return [roundedMin, roundedMax] as [number, number];
-  }, [data]);
+  const {
+    domain: rightAxisDomain,
+    visibleMilestoneMarkers
+  } = React.useMemo(
+    () => calculateStockChartDomain(data, milestoneMarkers),
+    [data, milestoneMarkers]
+  );
   const isWithinRightAxisDomain = React.useCallback((value: number) => {
     return value >= rightAxisDomain[0] && value <= rightAxisDomain[1];
   }, [rightAxisDomain]);
@@ -108,85 +169,148 @@ export function StockChart({
   const shouldShowInvestmentGoalLine = investmentGoal !== null
     && investmentGoal >= rightAxisDomain[0]
     && investmentGoal <= rightAxisDomain[1];
-  const trendGrowthLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
-    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % index trend until cutoff, then long-term growth`
-    : 'Growth scenario (average index trend)';
-  const trendGrowthWithPlannedLabel = trendAnnualGrowthRate !== null && trendAnnualGrowthRate !== undefined
-    ? `${Math.round(trendAnnualGrowthRate * 100 * 10) / 10} % index trend until cutoff + planned contributions, then long-term growth`
-    : 'Growth + planned contributions';
+  const nearTermGrowthRate = parseAnnualRate(
+    config.annual_growth_rate_near_term,
+    APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_NEAR_TERM
+  );
+  const longTermGrowthRate = parseAnnualRate(
+    config.annual_growth_rate_long_term,
+    APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_LONG_TERM
+  );
+  const nearTermGrowthLabel = isPrivacyMode
+    ? PRIVACY_RATE_MASK
+    : formatAnnualRate(nearTermGrowthRate);
+  const longTermGrowthLabel = isPrivacyMode
+    ? PRIVACY_RATE_MASK
+    : formatAnnualRate(longTermGrowthRate);
+  const hasValidTrendRate = typeof trendAnnualGrowthRate === 'number'
+    && Number.isFinite(trendAnnualGrowthRate);
+  const trendRateLabel = hasValidTrendRate
+    ? (isPrivacyMode ? PRIVACY_RATE_MASK : formatAnnualRate(trendAnnualGrowthRate))
+    : null;
+  const trendGrowthLabel = trendRateLabel
+    ? `${trendRateLabel} index + min`
+    : 'Index growth + min';
+  const trendGrowthWithPlannedLabel = trendRateLabel
+    ? `${trendRateLabel} index + planned`
+    : 'Index growth + planned';
   const plannedContributionAmount = config.planned_monthly_contribution;
   const plannedContributionUntil = config.planned_monthly_contributions_until;
-  const plannedContributionDescription = isPrivacyMode
-    ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions. Then assume min contributions from then on.'
-    : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions. Then assume min contributions from then on.`;
+  const parsedPlannedUntil = plannedContributionUntil
+    ? parseLocalCalendarDate(plannedContributionUntil)
+    : null;
+  const hasValidPlannedUntil = parsedPlannedUntil !== null
+    && !Number.isNaN(parsedPlannedUntil.getTime());
+  const cutoffLabel = isPrivacyMode
+    ? PRIVACY_DATE_MASK
+    : plannedContributionUntil || 'the planned-until month';
+  const configuredGrowthDescription = hasValidPlannedUntil
+    ? `${nearTermGrowthLabel} through ${cutoffLabel} inclusive, then ${longTermGrowthLabel}`
+    : `${nearTermGrowthLabel} for the full projection (no valid planned-until date is configured)`;
+  const plannedAmountLabel = isPrivacyMode
+    ? `${PRIVACY_VALUE_MASK} €/month`
+    : `${plannedContributionAmount || 'the configured amount'} €/month`;
+  const plannedThenMinimumDescription = hasValidPlannedUntil
+    ? `${plannedAmountLabel} through ${cutoffLabel} inclusive, then the recalculated minimum monthly amount until and including the goal month`
+    : `${plannedAmountLabel} on every monthly step until and including the goal month`;
+  const plannedThenLatestMinimumDescription = hasValidPlannedUntil
+    ? `${plannedAmountLabel} through ${cutoffLabel} inclusive, then the same latest minimum monthly amount as Target (min contributions) until and including the goal month`
+    : `${plannedAmountLabel} on every monthly step until and including the goal month`;
+  const plannedContributionDescription = `Growth: ${configuredGrowthDescription}. Contributions: ${plannedThenMinimumDescription}. The path starts at the first portfolio value (index-adjusted when available).`;
   const legendItems = React.useMemo<LegendItem[]>(() => ([
     {
       label: 'Percentage (left Y axis)',
-      description: 'Progress to reach the savings target.',
+      description: 'Progress along Target with fixed contributions. This is an axis guide, not a separate projection.',
       variant: 'note'
     },
     {
-      label: 'Current value of owned stocks',
-      description: 'The actual value of owned stocks.',
+      label: 'Owned stocks',
+      description: 'Growth: no rate is assumed. Contributions: only activity already reflected in each recorded portfolio value.',
       color: '#3b82f6',
       variant: 'area'
     },
     {
-      label: 'Current value (index trend)',
-      description: 'The stocks adjusted to the selected index trend instead of the daily price.',
+      label: 'Owned stocks (index trend)',
+      description: 'Growth: no future rate is assumed; each recorded value is adjusted with its index-to-trend factor. Contributions: only activity already reflected in the recorded value.',
       color: '#8b5cf6',
       strokeDasharray: '5 5',
       variant: 'line'
     },
     {
       label: 'Target with fixed contributions',
-      description: 'Baseline target assuming fixed contributions throughout, near-term growth through the planned-until date, and long-term growth afterward. The current value of stocks should always be higher than this.',
+      description: `Growth: ${configuredGrowthDescription}. Contributions: one fixed monthly amount, calculated once and added on every monthly step after the initial point until and including the goal month.`,
       color: '#ef4444',
       variant: 'line'
     },
     {
       label: 'Target (min contributions)',
-      description: 'Expected trajectory using the configured near- and long-term growth phases and the minimum contributions required to reach the investment goal.',
+      description: `Growth: ${configuredGrowthDescription}. Contributions: the minimum monthly amount calculated at the latest portfolio value (index-adjusted when available), added on every monthly step until and including the goal month.`,
       color: '#10b981',
       variant: 'line'
     },
     {
-      label: 'n % growth scenario',
-      description: 'Possibilities where both configured growth phases are one percentage point higher or lower.',
-      color: '#06b6d4',
+      label: 'Growth (+1 pp)',
+      description: hasValidPlannedUntil
+        ? `Growth: ${isPrivacyMode ? PRIVACY_RATE_MASK : formatAnnualRate(nearTermGrowthRate + 0.01)} through ${cutoffLabel} inclusive, then ${isPrivacyMode ? PRIVACY_RATE_MASK : formatAnnualRate(longTermGrowthRate + 0.01)}—one percentage point above each configured rate. Contributions: the same latest minimum monthly amount as Target (min contributions), added until and including the goal month.`
+        : `Growth: ${isPrivacyMode ? PRIVACY_RATE_MASK : formatAnnualRate(nearTermGrowthRate + 0.01)} for the full projection—one percentage point above the configured near-term rate. Contributions: the same latest minimum monthly amount as Target (min contributions), added until and including the goal month.`,
+      color: GROWTH_PLUS_COLOR,
       variant: 'line',
       hidden: isSimplified
     },
     {
-      label: 'Growth scenario (average index trend)',
-      description: 'Uses average historical index-trend growth through the planned-until date, then configured long-term growth. Assumes minimum contributions.',
-      color: '#06b6d4',
+      label: 'Growth (-1 pp)',
+      description: hasValidPlannedUntil
+        ? `Growth: ${isPrivacyMode ? PRIVACY_RATE_MASK : formatAnnualRate(nearTermGrowthRate - 0.01)} through ${cutoffLabel} inclusive, then ${isPrivacyMode ? PRIVACY_RATE_MASK : formatAnnualRate(longTermGrowthRate - 0.01)}—one percentage point below each configured rate. Contributions: the same latest minimum monthly amount as Target (min contributions), added until and including the goal month.`
+        : `Growth: ${isPrivacyMode ? PRIVACY_RATE_MASK : formatAnnualRate(nearTermGrowthRate - 0.01)} for the full projection—one percentage point below the configured near-term rate. Contributions: the same latest minimum monthly amount as Target (min contributions), added until and including the goal month.`,
+      color: GROWTH_MINUS_COLOR,
+      variant: 'line',
+      hidden: isSimplified
+    },
+    {
+      label: trendGrowthLabel,
+      description: `Growth: ${trendRateLabel || 'the fetched average historical index rate'} (the fetched historical-index average) for the full projection. Contributions: the same latest minimum monthly amount as Target (min contributions), added on every monthly step until and including the goal month.`,
+      color: INDEX_MIN_COLOR,
       strokeDasharray: '5 5',
       variant: 'line',
-      hidden: isSimplified
+      hidden: isSimplified || trendRateLabel === null
     },
     {
-      label: 'Growth + planned contributions',
-      description: 'Average index-trend growth with planned contributions through the planned-until date, then configured long-term growth.',
-      color: '#06b6d4',
+      label: trendGrowthWithPlannedLabel,
+      description: `Growth: ${trendRateLabel || 'the fetched average historical index rate'} (the fetched historical-index average) for the full projection. Contributions: ${plannedThenLatestMinimumDescription}.`,
+      color: INDEX_PLANNED_COLOR,
       strokeDasharray: '2 4',
       variant: 'line',
-      hidden: isSimplified
+      hidden: isSimplified || trendRateLabel === null
     },
     {
-      label: 'Planned contributions path',
+      label: 'Planned contributions',
       description: plannedContributionDescription,
       color: '#f59e0b',
       variant: 'line'
     },
     {
-      label: 'Goal path from cutoff (growth only)',
-      description: 'Required investment value at the planned-contribution cutoff, followed by long-term growth with no further contributions through the investment goal date.',
+      label: 'Goal (growth only)',
+      description: `Growth: ${longTermGrowthLabel} from the month after ${cutoffLabel} until and including the goal month. Contributions: none. The cutoff marker is the portfolio value required for growth alone to reach the goal.`,
       color: '#fde68a',
       strokeDasharray: '4 6',
-      variant: 'line'
+      variant: 'line',
+      hidden: !hasValidPlannedUntil
     }
-  ]), [isSimplified, plannedContributionDescription]);
+  ]), [
+    isPrivacyMode,
+    isSimplified,
+    configuredGrowthDescription,
+    cutoffLabel,
+    hasValidPlannedUntil,
+    longTermGrowthLabel,
+    longTermGrowthRate,
+    nearTermGrowthRate,
+    plannedContributionDescription,
+    plannedThenLatestMinimumDescription,
+    trendGrowthLabel,
+    trendGrowthWithPlannedLabel,
+    trendRateLabel
+  ]);
   const simplifyLinesButton = (
     <button
       type="button"
@@ -234,7 +358,7 @@ export function StockChart({
   }, [data]);
   const growthOnlyGoalStart = React.useMemo(() => {
     if (!config.planned_monthly_contributions_until) return null;
-    const plannedUntilDate = new Date(config.planned_monthly_contributions_until);
+    const plannedUntilDate = parseLocalCalendarDate(config.planned_monthly_contributions_until);
     if (Number.isNaN(plannedUntilDate.getTime())) return null;
     const firstPoint = data.find((item) =>
       item.date.getFullYear() === plannedUntilDate.getFullYear()
@@ -261,6 +385,7 @@ export function StockChart({
             dataKey="dateFormatted"
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
+            tickFormatter={(value) => formatPrivacyAwareDateTick(value, isPrivacyMode)}
           />
           <YAxis 
             yAxisId="progress"
@@ -306,17 +431,22 @@ export function StockChart({
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
                 color: 'hsl(var(--popover-foreground))'
               }}
+              itemSorter={(item) => {
+                const rawValue = Array.isArray(item.value) ? item.value[0] : item.value;
+                const numericValue = Number(rawValue);
+                return Number.isFinite(numericValue) ? -numericValue : 0;
+              }}
               formatter={(value, name) => {
-                const label = name === 'stocks_in_eur' ? 'Current value of owned stocks' : 
-                             name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Current value (index trend)' :
-                             name === 'plannedContributionLine' ? 'Planned contributions path' :
+                const label = name === 'stocks_in_eur' ? 'Owned stocks' :
+                             name === 'stocks_in_eur_adjusted_for_eunl_trend' ? 'Owned stocks (index trend)' :
+                             name === 'plannedContributionLine' ? 'Planned contributions' :
                              name === 'targetWithFixedContribution' ? 'Target with fixed contributions' :
                              name === 'targetWithMinimumContribution' ? 'Target (min contributions)' :
-                             name === 'lineWithMinusOnePercentGrowth' ? 'Growth scenario (-1 percentage point)' :
-                             name === 'lineWithPlusOnePercentGrowth' ? 'Growth scenario (+1 percentage point)' :
+                             name === 'lineWithMinusOnePercentGrowth' ? 'Growth (-1 pp)' :
+                             name === 'lineWithPlusOnePercentGrowth' ? 'Growth (+1 pp)' :
                              name === 'lineWithTrendGrowth' ? trendGrowthLabel :
                              name === 'lineWithTrendGrowthAndPlannedContribution' ? trendGrowthWithPlannedLabel :
-                             name === 'growthOnlyGoalLine' ? 'Goal path from cutoff (growth only)' :
+                             name === 'growthOnlyGoalLine' ? 'Goal (growth only)' :
                              'Unknown';
                 return [formatCurrency(value as number), label];
               }}
@@ -333,10 +463,10 @@ export function StockChart({
           <Line 
             type="monotone" 
             dataKey="lineWithPlusOnePercentGrowth"
-            stroke="#06b6d4" 
+            stroke={GROWTH_PLUS_COLOR}
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#06b6d4' }}
+            activeDot={{ r: 3, fill: GROWTH_PLUS_COLOR }}
             hide={isSimplified}
           />
           {/* 2. Target with minimum contributions */}
@@ -361,21 +491,21 @@ export function StockChart({
           <Line 
             type="monotone" 
             dataKey="lineWithTrendGrowth"
-            stroke="#06b6d4" 
+            stroke={INDEX_MIN_COLOR}
             strokeWidth={1}
             strokeDasharray="5 5"
             dot={false}
-            activeDot={{ r: 3, fill: '#06b6d4' }}
+            activeDot={{ r: 3, fill: INDEX_MIN_COLOR }}
             hide={isSimplified || data.every(item => item.lineWithTrendGrowth == null)}
           />
           <Line
             type="monotone"
             dataKey="lineWithTrendGrowthAndPlannedContribution"
-            stroke="#06b6d4"
+            stroke={INDEX_PLANNED_COLOR}
             strokeWidth={1}
             strokeDasharray="2 4"
             dot={false}
-            activeDot={{ r: 3, fill: '#06b6d4' }}
+            activeDot={{ r: 3, fill: INDEX_PLANNED_COLOR }}
             hide={isSimplified || data.every(item => item.lineWithTrendGrowthAndPlannedContribution == null)}
           />
           <Line
@@ -400,9 +530,7 @@ export function StockChart({
               strokeWidth={2}
             />
           )}
-          {milestoneMarkers
-            .filter((marker) => isWithinRightAxisDomain(marker.y))
-            .map((marker) => {
+          {visibleMilestoneMarkers.map((marker) => {
             const color = marker.achieved ? '#10b981' : '#f59e0b';
             return (
               <ReferenceDot
@@ -428,10 +556,10 @@ export function StockChart({
           <Line 
             type="monotone" 
             dataKey="lineWithMinusOnePercentGrowth"
-            stroke="#06b6d4" 
+            stroke={GROWTH_MINUS_COLOR}
             strokeWidth={1}
             dot={false}
-            activeDot={{ r: 3, fill: '#06b6d4' }}
+            activeDot={{ r: 3, fill: GROWTH_MINUS_COLOR }}
             hide={isSimplified}
           />
           {/* 4. Current value of owned stocks */}

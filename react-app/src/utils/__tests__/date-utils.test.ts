@@ -4,9 +4,25 @@ import {
   getWorkTimeFormatted,
   getRetirementProgress,
   getDaysToDate,
+  parseLocalCalendarDate,
 } from '../date-utils';
 
 describe('dateUtils', () => {
+  describe('parseLocalCalendarDate', () => {
+    it('preserves the local calendar month for a date-only value on the first day', () => {
+      const parsed = parseLocalCalendarDate('2024-02-01');
+
+      expect(parsed.getFullYear()).toBe(2024);
+      expect(parsed.getMonth()).toBe(1);
+      expect(parsed.getDate()).toBe(1);
+      expect(parsed.getHours()).toBe(0);
+    });
+
+    it('rejects an invalid calendar date instead of rolling it into another month', () => {
+      expect(parseLocalCalendarDate('2024-02-30').getTime()).toBeNaN();
+    });
+  });
+
   describe('countWorkdays', () => {
     it('should count workdays between two dates excluding weekends', () => {
       const startDate = new Date('2024-01-01T10:00:00'); // Monday

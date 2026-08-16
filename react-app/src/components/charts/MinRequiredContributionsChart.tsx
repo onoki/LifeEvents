@@ -9,6 +9,14 @@ import {
   isDateInOrBeforeMonth
 } from '../../utils/financial-utils';
 import { parseNumeric } from '../../utils/number-utils';
+import {
+  formatPrivacyAwareDateTick,
+  PRIVACY_DATE_MASK,
+  PRIVACY_RATE_MASK,
+  PRIVACY_VALUE_MASK,
+  maskNumericText,
+} from '../../utils/privacy-utils';
+import { parseLocalCalendarDate } from '../../utils/date-utils';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { APP_CONFIG } from '../../config/app-config';
 import { ChartLegend } from './ChartLegend';
@@ -67,6 +75,14 @@ const formatCurrencyPerMonth = (value: number): string => {
   return base.includes(' €') ? base.replace(' €', ' €/m') : `${base} €/m`;
 };
 
+const formatAnnualRate = (rate: number): string =>
+  `${Math.round(rate * 1000) / 10} %`;
+
+const parseAnnualRate = (value: string | undefined, fallback: number): number => {
+  const parsed = parseNumeric(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 /**
  * Minimum Required Contributions Chart Component
  * Displays the minimum required monthly contributions to reach investment goals
@@ -76,59 +92,97 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
   const fullDataSet = fullData && fullData.length > 0 ? fullData : data;
   const plannedContributionAmount = config.planned_monthly_contribution;
   const plannedContributionUntil = config.planned_monthly_contributions_until;
-  const plannedContributionDescription = isPrivacyMode
-    ? 'Target trajectory to minimize the monthly contributions by contributing larger sums in the beginning until a configured date to decrease the contributions.'
-    : `Target trajectory to minimize the monthly contributions by contributing larger sums (${plannedContributionAmount || 'configured amount'} €) in the beginning until ${plannedContributionUntil || 'a configured date'} to decrease the contributions.`;
+  const nearTermGrowthRate = parseAnnualRate(
+    config.annual_growth_rate_near_term,
+    APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_NEAR_TERM
+  );
+  const longTermGrowthRate = parseAnnualRate(
+    config.annual_growth_rate_long_term,
+    APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_LONG_TERM
+  );
+  const nearTermGrowthLabel = isPrivacyMode
+    ? PRIVACY_RATE_MASK
+    : formatAnnualRate(nearTermGrowthRate);
+  const longTermGrowthLabel = isPrivacyMode
+    ? PRIVACY_RATE_MASK
+    : formatAnnualRate(longTermGrowthRate);
+  const legendPlannedUntilDate = plannedContributionUntil
+    ? parseLocalCalendarDate(plannedContributionUntil)
+    : null;
+  const hasValidPlannedUntil = legendPlannedUntilDate !== null
+    && !Number.isNaN(legendPlannedUntilDate.getTime());
+  const cutoffLabel = isPrivacyMode
+    ? PRIVACY_DATE_MASK
+    : plannedContributionUntil || 'the planned-until month';
+  const configuredGrowthDescription = hasValidPlannedUntil
+    ? `${nearTermGrowthLabel} through ${cutoffLabel} inclusive, then ${longTermGrowthLabel}`
+    : `${nearTermGrowthLabel} for the full projection (no valid planned-until date is configured)`;
+  const plannedAmountLabel = isPrivacyMode
+    ? `${PRIVACY_VALUE_MASK} €/month`
+    : `${plannedContributionAmount || 'the configured amount'} €/month`;
+  const plannedRequirementDescription = hasValidPlannedUntil
+    ? `${plannedAmountLabel} through ${cutoffLabel} inclusive; the requirement is recalculated through that month, then its cutoff value is displayed unchanged afterward`
+    : `${plannedAmountLabel} on every monthly step until and including the goal month; the requirement is recalculated until the goal month`;
+  const plannedContributionDescription = `Growth assumptions used to solve the requirement: ${configuredGrowthDescription}. Contributions: ${plannedRequirementDescription}. The target starts from the first portfolio value (index-adjusted when available).`;
   const legendItems = React.useMemo<LegendItem[]>(() => ([
     {
       label: 'Percentage (left Y axis)',
-      description: 'Progress to reach 0 \u20AC savings target.',
+      description: 'Progress from the initial required monthly contribution toward zero monthly contribution. This is an axis guide, not a separate projection.',
       variant: 'note'
     },
     {
       label: 'Min required contribution',
-      description: 'Minimum monthly contributions needed to reach the investment goal, using near-term growth through the planned-until date and long-term growth afterward.',
+      description: `Growth assumptions used at each recorded point: ${configuredGrowthDescription}. Contributions: the chart solves the constant minimum monthly amount that would be added from that point until and including the goal month.`,
       color: '#3b82f6',
       variant: 'area'
     },
     {
-      label: 'Target min required contribution',
-      description: 'Projected minimum monthly contributions after the last recorded month to reach the investment goal.',
+      label: 'Target min contribution',
+      description: `Growth assumptions used when the latest requirement was solved: ${configuredGrowthDescription}. Contributions: the latest solved constant amount is displayed unchanged and assumed to be added on every future monthly step until and including the goal month.`,
       color: '#10b981',
       variant: 'line'
     },
     {
       label: 'Contribution (index trend)',
-      description: 'Minimum monthly contributions adjusted to the selected index trend instead of the daily price.',
+      description: `Growth assumptions used at each point: ${configuredGrowthDescription}. “Index trend” adjusts the recorded portfolio value; it does not replace those future growth rates. Contributions: the constant minimum monthly amount solved at each adjusted value.`,
       color: '#8b5cf6',
       strokeDasharray: '5 5',
       variant: 'line'
     },
     {
-      label: 'Target contribution (index trend)',
-      description: 'Projected contributions adjusted to the selected index trend after the last recorded month.',
+      label: 'Target (index trend)',
+      description: `Growth assumptions used when the latest adjusted requirement was solved: ${configuredGrowthDescription}. Contributions: that constant amount is displayed unchanged and assumed to be added on every future monthly step until and including the goal month.`,
       color: '#10b981',
       strokeDasharray: '5 5',
       variant: 'line'
     },
     {
       label: 'Expected estimate',
-      description: 'Expected trajectory of monthly contribution requirement based on current savings.',
+      description: `Growth assumptions used to solve the requirement: ${configuredGrowthDescription}. Contributions: ${plannedRequirementDescription}. This estimate starts from the latest portfolio value (index-adjusted when available).`,
       color: '#06b6d4',
       variant: 'line'
     },
     {
-      label: 'Target',
+      label: 'Planned target',
       description: plannedContributionDescription,
       color: '#f59e0b',
       variant: 'line'
     },
     {
       label: 'Scenario markers',
-      description: 'Dots on the planned-until date show required monthly contribution for each scenario.',
-      variant: 'note'
+      description: `Growth: ${nearTermGrowthLabel} from the latest portfolio value (index-adjusted when available) through ${cutoffLabel} inclusive, then ${longTermGrowthLabel}. Contributions: each dot applies its named scenario through the cutoff and shows the constant minimum monthly amount required afterward until and including the goal month.`,
+      variant: 'note',
+      hidden: !hasValidPlannedUntil
     }
-  ]), [plannedContributionDescription]);
+  ]), [
+    configuredGrowthDescription,
+    cutoffLabel,
+    hasValidPlannedUntil,
+    nearTermGrowthLabel,
+    longTermGrowthLabel,
+    plannedContributionDescription,
+    plannedRequirementDescription
+  ]);
   // Add target line data to the main dataset
   const chartData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -227,7 +281,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
 
   const plannedUntilDate = React.useMemo(() => {
     if (!config.planned_monthly_contributions_until) return null;
-    const parsed = new Date(config.planned_monthly_contributions_until);
+    const parsed = parseLocalCalendarDate(config.planned_monthly_contributions_until);
     if (Number.isNaN(parsed.getTime())) return null;
     return parsed;
   }, [config.planned_monthly_contributions_until]);
@@ -425,6 +479,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
             dataKey="dateFormatted"
             tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
+            tickFormatter={(value) => formatPrivacyAwareDateTick(value, isPrivacyMode)}
           />
           <YAxis 
             yAxisId="progress"
@@ -469,13 +524,18 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)',
                 color: 'hsl(var(--popover-foreground))'
               }}
+              itemSorter={(item) => {
+                const rawValue = Array.isArray(item.value) ? item.value[0] : item.value;
+                const numericValue = Number(rawValue);
+                return Number.isFinite(numericValue) ? -numericValue : 0;
+              }}
               formatter={(value, name) => {
                 const label = name === 'minRequiredContributionArea' ? 'Min required contribution' : 
-                             name === 'minRequiredContributionLine' ? 'Target min required contribution' :
+                             name === 'minRequiredContributionLine' ? 'Target min contribution' :
                              name === 'minRequiredContributionAdjustedArea' ? 'Contribution (index trend)' :
-                             name === 'minRequiredContributionAdjustedLine' ? 'Target contribution (index trend)' :
+                             name === 'minRequiredContributionAdjustedLine' ? 'Target (index trend)' :
                              name === 'expectedMinRequiredContribution' ? 'Expected estimate' :
-                             name === 'targetLine' ? 'Target' : 'Unknown';
+                             name === 'targetLine' ? 'Planned target' : 'Unknown';
                 return [formatCurrency(value as number), label];
               }}
             />
@@ -515,7 +575,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
                 ifOverflow="extendDomain"
               >
                 <Label
-                  value={scenario.shortLabel}
+                  value={isPrivacyMode ? PRIVACY_VALUE_MASK : scenario.shortLabel}
                   position={index % 2 === 0 ? 'top' : 'bottom'}
                   fill={scenario.color}
                   fontSize={10}
@@ -604,7 +664,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       {orderedScenarioResults.length > 0 && plannedUntilX && (
         <div className="mt-3 text-xs text-muted-foreground">
           <div className="font-semibold text-foreground">
-            Scenario markers at {plannedUntilX}
+            Scenario markers at {isPrivacyMode ? PRIVACY_DATE_MASK : plannedUntilX}
           </div>
           <div className="mt-2 flex flex-col gap-1">
             {orderedScenarioResults.map((scenario) => (
@@ -614,9 +674,11 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
                   style={{ backgroundColor: scenario.color }}
                   aria-hidden="true"
                 />
-                <span className="flex-1">{scenario.label}</span>
+                <span className="flex-1">
+                  {isPrivacyMode ? maskNumericText(scenario.label) : scenario.label}
+                </span>
                 <span className="font-semibold text-foreground">
-                  {isPrivacyMode ? '••••' : formatCurrencyPerMonth(scenario.y)}
+                  {isPrivacyMode ? PRIVACY_VALUE_MASK : formatCurrencyPerMonth(scenario.y)}
                 </span>
               </div>
             ))}

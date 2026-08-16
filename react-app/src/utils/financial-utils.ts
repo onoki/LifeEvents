@@ -1,6 +1,7 @@
 import { APP_CONFIG } from '../config/app-config';
 import type { Event, Config, ChartDataPoint } from '../types';
 import { parseNumeric } from './number-utils';
+import { parseLocalCalendarDate } from './date-utils';
 
 const monthsBetween = (start: Date, end: Date) =>
   (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
@@ -28,7 +29,7 @@ export function getAnnualGrowthRateForDate(config: Config, date: Date): number {
     APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_LONG_TERM
   );
   const plannedUntil = config.planned_monthly_contributions_until
-    ? new Date(config.planned_monthly_contributions_until)
+    ? parseLocalCalendarDate(config.planned_monthly_contributions_until)
     : null;
   if (!plannedUntil || Number.isNaN(plannedUntil.getTime())) return nearTermRate;
   return isDateInOrBeforeMonth(date, plannedUntil) ? nearTermRate : longTermRate;
@@ -92,7 +93,7 @@ export function calculateGrowthFactorForDates(config: Config, start: Date, end: 
   const millisecondsPerDay = 1000 * 60 * 60 * 24;
   if (end.getTime() === start.getTime()) return 1;
   const plannedUntil = config.planned_monthly_contributions_until
-    ? new Date(config.planned_monthly_contributions_until)
+    ? parseLocalCalendarDate(config.planned_monthly_contributions_until)
     : null;
   const validCutoff = plannedUntil && !Number.isNaN(plannedUntil.getTime()) ? plannedUntil : null;
   const growForDays = (rate: number, days: number) => Math.pow(1 + rate / 365, days);
@@ -155,7 +156,7 @@ export function calculateTargetWithFixedContribution(
   const investmentGoal = parseNumeric(config.investment_goal || APP_CONFIG.DEFAULTS.INVESTMENT_GOAL.toString());
   const plannedMonthlyContribution = parseNumeric(config.planned_monthly_contribution || '0');
   const plannedUntilDate = config.planned_monthly_contributions_until 
-    ? new Date(config.planned_monthly_contributions_until) 
+    ? parseLocalCalendarDate(config.planned_monthly_contributions_until)
     : null;
   const hasValidPlannedUntil = plannedUntilDate !== null && !Number.isNaN(plannedUntilDate.getTime());
   const hasTrendGrowth = trendAnnualGrowthRate !== undefined && trendAnnualGrowthRate !== null;
@@ -234,11 +235,11 @@ export function calculateTargetWithFixedContribution(
     const monthlyGrowthRate = getAnnualGrowthRateForDate(config, item.date) / 12;
     const monthlyRateMinusOne = (getAnnualGrowthRateForDate(config, item.date) - 0.01) / 12;
     const monthlyRatePlusOne = (getAnnualGrowthRateForDate(config, item.date) + 0.01) / 12;
-    const monthlyTrendRate = hasTrendGrowth
-      ? (hasValidPlannedUntil && isDateAfterMonth(item.date, plannedUntilDate!)
-          ? monthlyGrowthRate
-          : trendAnnualGrowthRate / 12)
-      : 0;
+    // The index-trend scenarios represent the fetched historical index trend,
+    // so they keep that rate for their entire projection. The cutoff controls
+    // planned contributions, but must not replace the fetched rate with a
+    // configured growth rate.
+    const monthlyTrendRate = hasTrendGrowth ? trendAnnualGrowthRate / 12 : 0;
 
     // Capital required at/after the planned-contribution cutoff for growth alone
     // to reach the investment goal at the end of the shared chart horizon.
@@ -326,7 +327,14 @@ export function calculateTargetWithFixedContribution(
       
       if (hasTrendGrowth) {
         lineWithTrendGrowth = projectionState.trendGrowthLine * (1 + monthlyTrendRate) + effectiveMinContribution;
-        const plannedContributionForTrend = contributesThisMonth ? plannedMonthlyContribution : 0;
+        const isAfterPlannedCutoff = hasValidPlannedUntil
+          && isDateAfterMonth(item.date, plannedUntilDate!);
+        const plannedContributionBeforeCutoff = plannedMonthlyContribution > 0
+          ? plannedMonthlyContribution
+          : 0;
+        const plannedContributionForTrend = isAfterPlannedCutoff
+          ? effectiveMinContribution
+          : plannedContributionBeforeCutoff;
         lineWithTrendGrowthAndPlannedContribution =
           projectionState.trendGrowthWithPlannedContributionLine * (1 + monthlyTrendRate) + plannedContributionForTrend;
       }
@@ -431,7 +439,7 @@ export function calculateTargetWithFixedContribution(
     const resultItem: ChartDataPoint = {
       ...item,
       dateFormatted: item.date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
-      // Tooltip order: 1. 8% growth scenario, 2. Target with minimum contributions, 3. Calculated trend, 4. 6% growth scenario, 5. Current value, 6. Target with fixed contributions
+      // Projection series; chart tooltips sort the visible values at render time.
       lineWithPlusOnePercentGrowth: lineWithPlusOnePercentGrowth ? Math.max(0, lineWithPlusOnePercentGrowth) : null,
       lineWithTrendGrowth: lineWithTrendGrowth ? Math.max(0, lineWithTrendGrowth) : null,
       lineWithTrendGrowthAndPlannedContribution: lineWithTrendGrowthAndPlannedContribution
@@ -633,7 +641,7 @@ export function calculateCurrentStockEstimate(
   // Get planned monthly contribution or fallback to minimum contribution
   const plannedMonthlyContribution = parseNumeric(config.planned_monthly_contribution || '0');
   const plannedUntil = config.planned_monthly_contributions_until
-    ? new Date(config.planned_monthly_contributions_until)
+    ? parseLocalCalendarDate(config.planned_monthly_contributions_until)
     : null;
   const plannedContributionIsActive = plannedMonthlyContribution > 0
     && (!plannedUntil

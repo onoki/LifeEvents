@@ -4,10 +4,25 @@ import {
   processStocksData,
   calculateTargetWithFixedContribution,
   calculateExponentialTrend,
+  getAnnualGrowthRateForDate,
 } from '../financial-utils';
+import { parseLocalCalendarDate } from '../date-utils';
 import type { Event } from '../../types';
 
 describe('financial-utils', () => {
+  describe('calendar-month cutoff', () => {
+    it('keeps a first-of-month cutoff in that month in every local timezone', () => {
+      const config = {
+        annual_growth_rate_near_term: '0.12',
+        annual_growth_rate_long_term: '0.03',
+        planned_monthly_contributions_until: '2024-02-01',
+      };
+
+      expect(getAnnualGrowthRateForDate(config, new Date(2024, 1, 29))).toBe(0.12);
+      expect(getAnnualGrowthRateForDate(config, new Date(2024, 2, 1))).toBe(0.03);
+    });
+  });
+
   describe('formatCurrency', () => {
     it('should format currency values correctly', () => {
       expect(formatCurrency(1000)).toBe('1 000 €');
@@ -262,6 +277,57 @@ describe('financial-utils', () => {
       expect(result[2].lineWithTrendGrowth).toBeCloseTo(100 * (1 + trendMonthly) + expectedMinRequired, 6);
     });
 
+    it('keeps fetched index-trend growth after the planned-contribution cutoff', () => {
+      const events: Event[] = [
+        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { date: parseLocalCalendarDate('2024-02-01') },
+        { date: parseLocalCalendarDate('2024-03-01') },
+      ];
+      const config = {
+        investment_goal: '1000',
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
+        planned_monthly_contribution: '10',
+        planned_monthly_contributions_until: '2024-02-01',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config, 0.24);
+
+      // The configured rates are both 0%, so this verifies that the fetched 2%
+      // monthly index trend remains active in March, after the February cutoff.
+      [100, 552, 1013.04].forEach((expected, index) => {
+        expect(result[index].lineWithTrendGrowth).toBeCloseTo(expected, 6);
+      });
+      // Planned contributions apply in February (the cutoff month); March uses
+      // the same minimum contribution as the index + min scenario.
+      [100, 112, 564.24].forEach((expected, index) => {
+        expect(result[index].lineWithTrendGrowthAndPlannedContribution).toBeCloseTo(expected, 6);
+      });
+    });
+
+    it('does not start minimum contributions before the cutoff when the planned amount is zero', () => {
+      const events: Event[] = [
+        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { date: parseLocalCalendarDate('2024-02-01') },
+        { date: parseLocalCalendarDate('2024-03-01') },
+      ];
+      const config = {
+        investment_goal: '300',
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
+        planned_monthly_contribution: '0',
+        planned_monthly_contributions_until: '2024-02-15',
+      };
+
+      const result = calculateTargetWithFixedContribution(events as any, config, 0);
+
+      // February is still part of the planned phase, even with a zero amount.
+      // The minimum contribution starts in March, the month after the cutoff.
+      [100, 100, 200].forEach((expected, index) => {
+        expect(result[index].lineWithTrendGrowthAndPlannedContribution).toBeCloseTo(expected, 6);
+      });
+    });
+
     it('projects planned contribution line with fixed monthly contributions (zero growth)', () => {
       const events: Event[] = [
         { date: new Date('2024-01-01'), stocks_in_eur: '100' },
@@ -284,10 +350,10 @@ describe('financial-utils', () => {
 
     it('projects the growth-only goal path from the planned contribution cutoff', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-01'), stocks_in_eur: '100' },
-        { date: new Date('2024-02-01') },
-        { date: new Date('2024-03-01') },
-        { date: new Date('2024-04-01') },
+        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { date: parseLocalCalendarDate('2024-02-01') },
+        { date: parseLocalCalendarDate('2024-03-01') },
+        { date: parseLocalCalendarDate('2024-04-01') },
       ];
       const config = {
         investment_goal: '1000',
@@ -306,10 +372,10 @@ describe('financial-utils', () => {
 
     it('switches every configured-rate projection from near-term to long-term growth at the cutoff', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-01'), stocks_in_eur: '100' },
-        { date: new Date('2024-02-01') },
-        { date: new Date('2024-03-01') },
-        { date: new Date('2024-04-01') },
+        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { date: parseLocalCalendarDate('2024-02-01') },
+        { date: parseLocalCalendarDate('2024-03-01') },
+        { date: parseLocalCalendarDate('2024-04-01') },
       ];
       const config = {
         investment_goal: '104',
@@ -339,9 +405,9 @@ describe('financial-utils', () => {
 
     it('keeps near-term growth and planned contributions active for the entire cutoff month', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-31'), stocks_in_eur: '100' },
-        { date: new Date('2024-02-29') },
-        { date: new Date('2024-03-31') },
+        { date: parseLocalCalendarDate('2024-01-31'), stocks_in_eur: '100' },
+        { date: parseLocalCalendarDate('2024-02-29') },
+        { date: parseLocalCalendarDate('2024-03-31') },
       ];
       const config = {
         investment_goal: '111',

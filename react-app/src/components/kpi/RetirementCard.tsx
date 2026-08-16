@@ -4,6 +4,7 @@ import { useKPICalculations } from '../../hooks/use-kpi-calculations';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { formatPercentage } from '../../utils/financial-utils';
 import { APP_CONFIG } from '../../config/app-config';
+import { PRIVACY_DATE_MASK, PRIVACY_RATE_MASK, PRIVACY_VALUE_MASK } from '../../utils/privacy-utils';
 
 /**
  * Retirement Card Component
@@ -37,15 +38,15 @@ export function RetirementCard(): React.JSX.Element {
             </div>
             <div>
               <div className="text-2xl font-bold">
-                {isPrivacyMode ? '••••' : retirementTimeFormatted}
+                {isPrivacyMode ? PRIVACY_VALUE_MASK : retirementTimeFormatted}
               </div>
               <div className="text-base font-medium text-gray-500">
-                {isPrivacyMode ? '•••• workdays' : `${retirementWorkdays.toLocaleString('en-US').replace(/,/g, ' ')} workdays`}
+                {isPrivacyMode ? `${PRIVACY_VALUE_MASK} workdays` : `${retirementWorkdays.toLocaleString('en-US').replace(/,/g, ' ')} workdays`}
               </div>
             </div>
           </div>
           <div className="text-base font-semibold text-gray-600">
-            {formatPercentage(retirementProgress, 2)}
+            {isPrivacyMode ? PRIVACY_RATE_MASK : formatPercentage(retirementProgress, 2)}
           </div>
         </div>
         <div className="mt-auto pt-2">
@@ -56,8 +57,8 @@ export function RetirementCard(): React.JSX.Element {
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2 mb-1">
-            <span>{isPrivacyMode ? '••••-••-••' : APP_CONFIG.DATES.RETIREMENT_START.split('T')[0]}</span>
-            <span>{isPrivacyMode ? '••••-••-••' : APP_CONFIG.DATES.RETIREMENT_END.split('T')[0]}</span>
+            <span>{isPrivacyMode ? PRIVACY_DATE_MASK : APP_CONFIG.DATES.RETIREMENT_START.split('T')[0]}</span>
+            <span>{isPrivacyMode ? PRIVACY_DATE_MASK : APP_CONFIG.DATES.RETIREMENT_END.split('T')[0]}</span>
           </div>
         </div>
       </CardContent>
