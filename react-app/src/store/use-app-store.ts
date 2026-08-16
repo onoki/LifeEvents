@@ -3,6 +3,13 @@ import { devtools } from 'zustand/middleware';
 import type { Event, Config, Condition, IndexDataPoint, MiniReward, TrendStats } from '../types';
 import { parseExternalJson, type JsonPayloadValidator } from '../utils/external-api-utils';
 import { fetchConfiguredIndexApi, type IndexApiSeries } from '../utils/index-api-utils';
+import {
+  readIndexApiSessionCache,
+  shouldReadIndexApiSessionCache,
+  shouldUseLegacyIndexFallback,
+  writeIndexApiSessionCache,
+  type IndexFetchPolicy,
+} from '../utils/index-fetch-utils';
 import { fetchTsvText } from '../utils/sheet-data-utils';
 
 interface AppState {
@@ -15,9 +22,11 @@ interface AppState {
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
   averageIndexTrendStats: TrendStats | null;
   indexError: string | null;
+  indexNotice: string | null;
   
   // UI state
   loading: boolean;
+  indexLoading: boolean;
   error: string | null;
   status: string;
   sheetsUrl: string;
@@ -38,7 +47,7 @@ interface AppState {
   
   // Complex actions
   loadData: (url: string) => Promise<void>;
-  fetchIndexData: (symbol?: string) => Promise<void>;
+  fetchIndexData: (symbol?: string, policy?: IndexFetchPolicy) => Promise<void>;
   reset: () => void;
 }
 
@@ -51,11 +60,16 @@ const initialState = {
   indexTrendStatsBySymbol: {},
   averageIndexTrendStats: null,
   indexError: null,
+  indexNotice: null,
   loading: false,
+  indexLoading: false,
   error: null,
   status: '',
   sheetsUrl: '',
 };
+
+const indexFetchesInFlight = new Map<string, Promise<void>>();
+let activeIndexFetchCount = 0;
 
 export const useAppStore = create<AppState>()(
   devtools(
@@ -81,7 +95,7 @@ export const useAppStore = create<AppState>()(
         const { APP_CONFIG } = await import('../config/app-config');
         const { parseTSVData } = await import('../utils/data-processing-utils');
         
-        set({ loading: true, error: null, indexError: null, status: 'Fetching data from Google Sheets...' });
+        set({ loading: true, error: null, status: 'Fetching data from Google Sheets...' });
 
         try {
           const tsvData = await fetchTsvText(url);
@@ -110,7 +124,14 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      fetchIndexData: async (symbol?: string) => {
+      fetchIndexData: (symbol?: string, policy: IndexFetchPolicy = 'manual') => {
+        const requestKey = `${policy}:${symbol ?? 'all'}`;
+        const existingRequest = indexFetchesInFlight.get(requestKey);
+        if (existingRequest) return existingRequest;
+
+        const request = (async (): Promise<void> => {
+        const isAutomatic = policy === 'automatic';
+        const allowLegacyFallback = shouldUseLegacyIndexFallback(policy);
         const { APP_CONFIG } = await import('../config/app-config');
         const { calculateExponentialTrend } = await import('../utils/financial-utils');
 
@@ -123,37 +144,66 @@ export const useAppStore = create<AppState>()(
         const fetchScopeSymbols = indexDefinitionsToFetch.map((series) => series.symbol);
 
         if (indexDefinitionsToFetch.length === 0) {
-          set({
-            loading: false,
-            indexError: `Unknown index symbol: ${symbol}`,
-            status: 'Error loading index data',
-          });
+          if (isAutomatic) {
+            set({
+              indexNotice: 'Index data is temporarily unavailable.',
+              indexError: null,
+            });
+          } else {
+            set({
+              indexError: `Unknown index symbol: ${symbol}`,
+              indexNotice: null,
+              status: 'Error loading index data',
+            });
+          }
           return;
         }
 
+        activeIndexFetchCount += 1;
         set({
-          loading: true,
+          indexLoading: true,
           indexError: null,
-          status: `Fetching ${indexDefinitionsToFetch.length} index series...`,
+          indexNotice: null,
+          ...(isAutomatic
+            ? {}
+            : { status: `Fetching ${indexDefinitionsToFetch.length} index series...` }),
         });
 
         try {
           const configuredIndexApiUrl = import.meta.env.VITE_INDEX_API_URL?.trim();
           const configuredSeriesBySymbol = new Map<string, IndexApiSeries>();
           const configuredApiErrorsBySymbol = new Map<string, string>();
+          let configuredResponseWasCached = false;
 
-          // This endpoint is optional by design. Leaving the variable unset skips
-          // it entirely, and every failure below falls through to the established
-          // provider/direct/public-proxy implementation later in this action.
+          // Automatic startup loading uses only this controlled endpoint. Manual
+          // requests retain the established provider/public-proxy fallback below.
           if (configuredIndexApiUrl) {
-            set({ status: 'Fetching indexes through the configured Vercel endpoint...' });
+            if (!isAutomatic) {
+              set({ status: 'Fetching indexes through the configured Vercel endpoint...' });
+            }
             try {
-              const response = await fetchConfiguredIndexApi({
-                endpoint: configuredIndexApiUrl,
-                requestedSymbol: symbol ?? 'all',
-                expectedSymbols: fetchScopeSymbols,
-                timeoutMs: APP_CONFIG.API.REQUEST_TIMEOUT_MS,
-              });
+              const cachedResponse = shouldReadIndexApiSessionCache(policy, symbol)
+                ? readIndexApiSessionCache({
+                    endpoint: configuredIndexApiUrl,
+                    expectedSymbols: fetchScopeSymbols,
+                  })
+                : null;
+              const response = cachedResponse ?? await fetchConfiguredIndexApi({
+                  endpoint: configuredIndexApiUrl,
+                  requestedSymbol: symbol ?? 'all',
+                  expectedSymbols: fetchScopeSymbols,
+                  timeoutMs: APP_CONFIG.API.REQUEST_TIMEOUT_MS,
+                });
+              configuredResponseWasCached = cachedResponse !== null;
+
+              if (!configuredResponseWasCached && symbol === undefined) {
+                writeIndexApiSessionCache({
+                  endpoint: configuredIndexApiUrl,
+                  expectedSymbols: fetchScopeSymbols,
+                  response,
+                });
+              }
+
               response.series.forEach((series) => {
                 configuredSeriesBySymbol.set(series.symbol, series);
               });
@@ -165,8 +215,19 @@ export const useAppStore = create<AppState>()(
               fetchScopeSymbols.forEach((targetSymbol) => {
                 configuredApiErrorsBySymbol.set(targetSymbol, errorMessage);
               });
-              console.warn('Configured index API unavailable; using the existing index-fetch fallback.', error);
+              if (isAutomatic) {
+                console.info('Automatic index refresh is temporarily unavailable.', error);
+              } else {
+                console.warn('Configured index API unavailable; using the existing index-fetch fallback.', error);
+              }
             }
+          } else if (isAutomatic) {
+            fetchScopeSymbols.forEach((targetSymbol) => {
+              configuredApiErrorsBySymbol.set(
+                targetSymbol,
+                'The configured index endpoint is unavailable.'
+              );
+            });
           }
 
           type IndexDefinition = (typeof APP_CONFIG.API.INDEX_SERIES)[number];
@@ -268,7 +329,7 @@ export const useAppStore = create<AppState>()(
           let preferredExternalProxyUrl: string | null = null;
 
           const getOrderedExternalProxies = (): string[] => {
-            const configuredProxies = APP_CONFIG.API.CORS_PROXIES;
+            const configuredProxies: readonly string[] = APP_CONFIG.API.CORS_PROXIES;
             if (!preferredExternalProxyUrl) {
               return [...configuredProxies];
             }
@@ -830,15 +891,13 @@ export const useAppStore = create<AppState>()(
             ...existingIndexTrendStatsBySymbol,
           };
           const loadErrors: string[] = [];
+          const successfullyLoadedSymbols = new Set<string>();
           let newlyLoadedCount = 0;
 
           const publishIndexDataProgress = (statusOverride?: string): void => {
-            const loadedSymbols = fetchScopeSymbols
-              .filter((symbol) => {
-                const points = nextIndexDataBySymbol[symbol];
-                return Array.isArray(points) && points.length > 0;
-              });
-            const missingSymbols = fetchScopeSymbols.filter((targetSymbol) => !loadedSymbols.includes(targetSymbol));
+            const missingSymbols = fetchScopeSymbols.filter(
+              (targetSymbol) => !successfullyLoadedSymbols.has(targetSymbol)
+            );
             const availableTrendStats = Object.values(nextIndexTrendStatsBySymbol).filter(
               (stats): stats is TrendStats => stats !== null
             );
@@ -848,25 +907,36 @@ export const useAppStore = create<AppState>()(
                   standardDeviation: availableTrendStats.reduce((sum, stats) => sum + stats.standardDeviation, 0) / availableTrendStats.length,
                 }
               : null;
-            const hasAnyData = loadedSymbols.length > 0;
+            const hasAnyData = successfullyLoadedSymbols.size > 0;
 
             set({
               indexDataBySymbol: { ...nextIndexDataBySymbol },
               indexTrendStatsBySymbol: { ...nextIndexTrendStatsBySymbol },
               averageIndexTrendStats,
-              indexError: loadErrors.length > 0
-                ? `Some index sources failed. ${loadErrors.join(' | ')}`
+              indexError: isAutomatic
+                ? null
+                : (loadErrors.length > 0
+                    ? `Some index sources failed. ${loadErrors.join(' | ')}`
+                    : null),
+              indexNotice: isAutomatic && loadErrors.length > 0
+                ? (hasAnyData
+                    ? 'Some index data is temporarily unavailable.'
+                    : 'Index data is temporarily unavailable.')
                 : null,
-              status: statusOverride ?? (hasAnyData
-                ? (missingSymbols.length === 0
-                    ? `Loaded ${newlyLoadedCount} index series`
-                    : `Loaded ${newlyLoadedCount} index series. Still missing: ${missingSymbols.join(', ')}`)
-                : 'Error loading index data'),
+              ...(isAutomatic
+                ? {}
+                : {
+                    status: statusOverride ?? (hasAnyData
+                      ? (missingSymbols.length === 0
+                          ? `Loaded ${newlyLoadedCount} index series`
+                          : `Loaded ${newlyLoadedCount} index series. Still missing: ${missingSymbols.join(', ')}`)
+                      : 'Error loading index data'),
+                  }),
             });
           };
 
           let morningstarToken: string | null = null;
-          const morningstarNeeded = indexDefinitionsToFetch.some((indexDefinition) => (
+          const morningstarNeeded = allowLegacyFallback && indexDefinitionsToFetch.some((indexDefinition) => (
             indexDefinition.source === 'morningstar'
             && !configuredSeriesBySymbol.has(indexDefinition.symbol)
           ));
@@ -883,7 +953,9 @@ export const useAppStore = create<AppState>()(
 
           for (const indexDefinition of indexDefinitionsToFetch) {
             try {
-              set({ status: `Fetching ${indexDefinition.symbol} index data...` });
+              if (!isAutomatic) {
+                set({ status: `Fetching ${indexDefinition.symbol} index data...` });
+              }
               let points: IndexDataPoint[] = [];
               let sourceName = 'direct';
               const configuredSeries = configuredSeriesBySymbol.get(indexDefinition.symbol);
@@ -902,7 +974,14 @@ export const useAppStore = create<AppState>()(
                     };
                   })
                   .sort((left, right) => left.date.getTime() - right.date.getTime());
-                sourceName = `Vercel (${configuredSeries.source})`;
+                sourceName = configuredResponseWasCached
+                  ? `browser cache (${configuredSeries.source})`
+                  : `Vercel (${configuredSeries.source})`;
+              } else if (!allowLegacyFallback) {
+                throw new Error(
+                  configuredApiErrorsBySymbol.get(indexDefinition.symbol)
+                    ?? 'The configured endpoint did not return this index.'
+                );
               } else if (indexDefinition.source === 'yahoo') {
                 // Keep the existing implementation as the operational fallback.
                 const result = await fetchYahooIndex(indexDefinition);
@@ -935,25 +1014,60 @@ export const useAppStore = create<AppState>()(
               const { data: dataWithTrend, trendStats } = calculateExponentialTrend(points);
               nextIndexDataBySymbol[indexDefinition.symbol] = dataWithTrend as IndexDataPoint[];
               nextIndexTrendStatsBySymbol[indexDefinition.symbol] = trendStats;
+              successfullyLoadedSymbols.add(indexDefinition.symbol);
               newlyLoadedCount += 1;
-              publishIndexDataProgress(`Loaded ${indexDefinition.symbol} (${points.length} points) via ${sourceName}`);
+              publishIndexDataProgress(
+                `Loaded ${indexDefinition.symbol} (${points.length} points) via ${sourceName}`
+              );
             } catch (err) {
               const errorMessage = err instanceof Error ? err.message : APP_CONFIG.ERRORS.FETCH_FAILED;
               const configuredApiError = configuredApiErrorsBySymbol.get(indexDefinition.symbol);
-              loadErrors.push(
-                `${indexDefinition.symbol}: ${configuredApiError
-                  ? `Vercel: ${configuredApiError}; fallback: ${errorMessage}`
-                  : errorMessage}`
-              );
-              console.error(`Failed to load index data for ${indexDefinition.symbol}:`, err);
-              publishIndexDataProgress(`Failed ${indexDefinition.symbol}; continuing...`);
+              if (isAutomatic) {
+                loadErrors.push(`${indexDefinition.symbol}: ${configuredApiError ?? errorMessage}`);
+                console.info(`Automatic index refresh did not load ${indexDefinition.symbol}.`);
+                publishIndexDataProgress();
+              } else {
+                loadErrors.push(
+                  `${indexDefinition.symbol}: ${configuredApiError
+                    ? `Vercel: ${configuredApiError}; fallback: ${errorMessage}`
+                    : errorMessage}`
+                );
+                console.error(`Failed to load index data for ${indexDefinition.symbol}:`, err);
+                publishIndexDataProgress(`Failed ${indexDefinition.symbol}; continuing...`);
+              }
             }
           }
           publishIndexDataProgress();
-          
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : APP_CONFIG.ERRORS.FETCH_FAILED;
+          if (isAutomatic) {
+            console.info('Automatic index refresh is temporarily unavailable.', err);
+            set({
+              indexError: null,
+              indexNotice: 'Index data is temporarily unavailable.',
+            });
+          } else {
+            console.error('Error loading index data:', err);
+            set({
+              indexError: errorMessage,
+              indexNotice: null,
+              status: 'Error loading index data',
+            });
+          }
         } finally {
-          set({ loading: false });
+          activeIndexFetchCount = Math.max(0, activeIndexFetchCount - 1);
+          set({ indexLoading: activeIndexFetchCount > 0 });
         }
+        })();
+
+        indexFetchesInFlight.set(requestKey, request);
+        const clearCompletedRequest = (): void => {
+          if (indexFetchesInFlight.get(requestKey) === request) {
+            indexFetchesInFlight.delete(requestKey);
+          }
+        };
+        request.then(clearCompletedRequest, clearCompletedRequest);
+        return request;
       },
 
       reset: () => set(initialState),

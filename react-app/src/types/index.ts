@@ -96,6 +96,7 @@ export interface StockChartsProps {
   onViewModeChange: (mode: ViewMode) => void;
   averageIndexTrendStats?: TrendStats | null;
   indexError?: string | null;
+  indexNotice?: string | null;
 }
 
 export interface StockChartProps {
@@ -115,10 +116,11 @@ export interface IndexHistoryChartProps {
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
   onFetchIndexData?: (symbol?: string) => Promise<void>;
   loading: boolean;
-  showOnlyDataWithStocks: boolean;
   stocksData: Event[];
+  config: Config;
   viewMode: ViewMode;
   indexError?: string | null;
+  indexNotice?: string | null;
 }
 
 export interface MinRequiredContributionsChartProps {
@@ -151,14 +153,16 @@ export interface UseDataReturn {
   config: Config;
   conditions: Condition[];
   loading: boolean;
+  indexLoading: boolean;
   error: string | null;
   status: string;
   loadData: (url: string) => Promise<void>;
   indexDataBySymbol: Record<string, IndexDataPoint[]>;
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
   averageIndexTrendStats?: TrendStats | null;
-  fetchIndexData: (symbol?: string) => Promise<void>;
+  fetchIndexData: (symbol?: string, policy?: 'manual' | 'automatic') => Promise<void>;
   indexError?: string | null;
+  indexNotice?: string | null;
 }
 
 // API response types
@@ -176,7 +180,7 @@ export interface YahooFinanceResponse {
 }
 
 // Utility types
-export type ViewMode = 'recorded' | 'next2years' | 'next5years' | 'full';
+export type ViewMode = 'recorded' | 'next2years' | 'planned' | 'full';
 
 export interface MonthlyEventData {
   month: string;

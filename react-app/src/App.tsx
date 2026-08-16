@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { KPICards } from '@/components/kpi/KPICards'
@@ -23,13 +23,28 @@ function App(): React.JSX.Element {
     loading, 
     error, 
     loadData, 
+    indexLoading,
     indexDataBySymbol,
     indexTrendStatsBySymbol,
     fetchIndexData,
     averageIndexTrendStats,
-    indexError
+    indexError,
+    indexNotice
   } = useAppStore()
   const { isPrivacyMode, getPrivacyUrl } = usePrivacyMode()
+  const automaticIndexFetchStarted = useRef(false)
+
+  // Load public index history independently of the user's Sheets data. The
+  // ref prevents React Strict Mode's development-only effect replay from
+  // starting a duplicate request; the store also deduplicates in-flight work.
+  useEffect(() => {
+    if (automaticIndexFetchStarted.current) return
+
+    automaticIndexFetchStarted.current = true
+    void fetchIndexData(undefined, 'automatic').catch((fetchError: unknown) => {
+      console.error('Unexpected automatic index fetch failure:', fetchError)
+    })
+  }, [fetchIndexData])
 
   // Load URL from GET parameter on component mount
   useEffect(() => {
@@ -53,7 +68,7 @@ function App(): React.JSX.Element {
 
 
   const handleFetchIndexData = async (symbol?: string): Promise<void> => {
-    await fetchIndexData(symbol)
+    await fetchIndexData(symbol, 'manual')
   }
 
   return (
@@ -96,11 +111,12 @@ function App(): React.JSX.Element {
               indexDataBySymbol={indexDataBySymbol}
               indexTrendStatsBySymbol={indexTrendStatsBySymbol}
               onFetchIndexData={handleFetchIndexData}
-              loading={loading}
+              loading={indexLoading}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               averageIndexTrendStats={averageIndexTrendStats}
               indexError={indexError}
+              indexNotice={indexNotice}
             />
           </>
         )}
@@ -149,7 +165,7 @@ function App(): React.JSX.Element {
 
         {data && data.length > 0 && (
           <div className="mt-8">
-            <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} config={config} />
           </div>
         )}
 

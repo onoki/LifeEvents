@@ -22,7 +22,8 @@ export function StockCharts({
   viewMode,
   onViewModeChange,
   averageIndexTrendStats,
-  indexError
+  indexError,
+  indexNotice
 }: StockChartsProps): React.JSX.Element {
 
   if (!data || data.length === 0) {
@@ -59,7 +60,7 @@ export function StockCharts({
   return (
     <div className="space-y-6">
       {/* View Mode Toggle Control */}
-      <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+      <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} config={config} />
 
       {/* Owned stocks chart - full width */}
       <div className="mb-8">
@@ -93,10 +94,11 @@ export function StockCharts({
           indexTrendStatsBySymbol={indexTrendStatsBySymbol}
           onFetchIndexData={handleFetchIndexData}
           loading={loading}
-          showOnlyDataWithStocks={viewMode === 'recorded'}
-          stocksData={filteredData}
+          stocksData={data}
+          config={config}
           viewMode={viewMode}
           indexError={indexError}
+          indexNotice={indexNotice}
         />
       </div>
     </div>

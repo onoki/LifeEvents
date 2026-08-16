@@ -427,7 +427,7 @@ describe('financial-utils', () => {
   });
 
   describe('calculateExponentialTrend', () => {
-    it('returns trend stats and confidence bounds that match exponential data', () => {
+    it('returns trend stats and historical residual bounds that match exponential data', () => {
       const data = [
         { date: new Date('2024-01-01'), price: 100 },
         { date: new Date('2024-01-02'), price: 110 },
@@ -448,6 +448,40 @@ describe('financial-utils', () => {
       expect(lastPoint.multiplier).toBeCloseTo(1, 6);
       expect(firstPoint.trendUpperBound).toBeGreaterThanOrEqual(firstPoint.trendLowerBound);
       expect(lastPoint.trendUpperBound).toBeGreaterThanOrEqual(lastPoint.trendLowerBound);
+    });
+
+    it('constructs the historical sigma band multiplicatively in log space', () => {
+      const logPeak = 0.3;
+      const data = [
+        { date: new Date('2024-01-01'), value: 1 },
+        { date: new Date('2024-01-02'), value: Math.exp(logPeak) },
+        { date: new Date('2024-01-03'), value: 1 },
+      ];
+
+      const result = calculateExponentialTrend(data);
+      if (!result.trendStats) throw new Error('Expected trend statistics');
+
+      const expectedSigma = logPeak * Math.sqrt(2 / 3);
+      const point = result.data[1];
+
+      expect(result.trendStats.standardDeviation).toBeCloseTo(expectedSigma, 10);
+      expect(point.trendUpperBound / point.trend).toBeCloseTo(Math.exp(expectedSigma), 10);
+      expect(point.trendLowerBound / point.trend).toBeCloseTo(Math.exp(-expectedSigma), 10);
+      expect(point.trendUpperBound * point.trendLowerBound).toBeCloseTo(point.trend ** 2, 10);
+    });
+
+    it('does not produce a non-finite sigma when fewer than three valid observations remain', () => {
+      const data = [
+        { date: new Date('2024-01-01'), value: 100 },
+        { date: new Date('2024-02-01'), value: 110 },
+        { date: new Date('2024-03-01'), value: 0 },
+      ];
+
+      const result = calculateExponentialTrend(data);
+
+      expect(result.trendStats).toBeNull();
+      expect(result.data).toBe(data);
+      expect(result.data[0].trendUpperBound).toBeUndefined();
     });
   });
 });

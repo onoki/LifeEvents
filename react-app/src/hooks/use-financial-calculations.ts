@@ -31,7 +31,7 @@ export function useFinancialCalculations(
     const fullStocksData = processStocksData(data);
     
     // Filter data based on view mode (only for display)
-    const filteredData = filterDataByViewMode(data, viewMode);
+    const filteredData = filterDataByViewMode(data, viewMode, config);
     const stocksData = processStocksData(filteredData);
 
     // Calculate milestone markers

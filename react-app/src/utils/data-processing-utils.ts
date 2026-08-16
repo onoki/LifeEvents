@@ -3,6 +3,103 @@ import { APP_CONFIG } from '../config/app-config';
 import { parseNumeric } from './number-utils';
 import { parseLocalCalendarDate } from './date-utils';
 
+export interface ChartDateRange {
+  /** Null means that the range has no lower bound. */
+  min: Date | null;
+  /** Null means that the range has no upper bound. */
+  max: Date | null;
+}
+
+const FULL_CHART_DATE_RANGE: ChartDateRange = { min: null, max: null };
+
+const startOfLocalDay = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+/** Add calendar years while keeping leap-day values within the target month. */
+const addCalendarYears = (date: Date, years: number): Date => {
+  const targetYear = date.getFullYear() + years;
+  const targetMonth = date.getMonth();
+  const lastDayInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return new Date(
+    targetYear,
+    targetMonth,
+    Math.min(date.getDate(), lastDayInTargetMonth)
+  );
+};
+
+/**
+ * Resolve the end of the planned-period view. A null value means that the
+ * configured date is invalid, or that its one-year buffer does not reach
+ * beyond today and the view should therefore be omitted.
+ */
+export function getPlannedEndPlusOneYear(
+  config: Config,
+  now: Date = new Date()
+): Date | null {
+  const rawPlannedEnd = config.planned_monthly_contributions_until;
+  if (!rawPlannedEnd) return null;
+
+  const plannedEnd = parseLocalCalendarDate(rawPlannedEnd);
+  if (Number.isNaN(plannedEnd.getTime())) return null;
+
+  const bufferedEnd = addCalendarYears(startOfLocalDay(plannedEnd), 1);
+  return bufferedEnd > startOfLocalDay(now) ? bufferedEnd : null;
+}
+
+export function isPlannedEndPlusOneYearAvailable(
+  config: Config,
+  now: Date = new Date()
+): boolean {
+  return getPlannedEndPlusOneYear(config, now) !== null;
+}
+
+/**
+ * Derive one shared X range for all financial charts and the index-history
+ * chart. The `now` argument is injectable so date-sensitive behavior remains
+ * deterministic in tests.
+ *
+ * If a planned-period view becomes unavailable while selected, it falls back
+ * to the default next-two-years horizon. Full range is explicitly unbounded.
+ */
+export function getChartDateRange(
+  data: Event[],
+  config: Config,
+  viewMode: ViewMode,
+  now: Date = new Date()
+): ChartDateRange {
+  if (viewMode === 'full') {
+    return FULL_CHART_DATE_RANGE;
+  }
+
+  const stockDates = data
+    .filter((item) => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0)
+    .map((item) => item.date)
+    .filter((date) => date instanceof Date && !Number.isNaN(date.getTime()));
+
+  if (stockDates.length === 0) {
+    return FULL_CHART_DATE_RANGE;
+  }
+
+  const firstStockDate = new Date(Math.min(...stockDates.map((date) => date.getTime())));
+  const latestStockDate = new Date(Math.max(...stockDates.map((date) => date.getTime())));
+  const min = new Date(firstStockDate.getFullYear(), firstStockDate.getMonth() - 1, 1);
+
+  if (viewMode === 'recorded') {
+    return { min, max: latestStockDate };
+  }
+
+  const defaultEnd = addCalendarYears(startOfLocalDay(now), 2);
+  if (viewMode === 'planned') {
+    return {
+      min,
+      max: getPlannedEndPlusOneYear(config, now) ?? defaultEnd,
+    };
+  }
+
+  return { min, max: defaultEnd };
+}
+
 /**
  * Process and normalize event data
  */
@@ -216,45 +313,26 @@ export function getRecentEvents(data: Event[], limit: number = APP_CONFIG.UI.MAX
  * Filter data based on view mode
  */
 export function filterDataByViewMode(
-  data: Event[], 
-  viewMode: ViewMode
+  data: Event[],
+  viewMode: ViewMode,
+  config: Config = {},
+  now: Date = new Date()
 ): Event[] {
-  if (viewMode === 'recorded') {
-    // Show recorded range with a one-month lead-in so the first recorded point
-    // is not pinned to the left edge of charts.
-    const stocksData = data.filter((item) => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
-    if (stocksData.length === 0) {
+  const range = getChartDateRange(data, config, viewMode, now);
+  if (range.min === null && range.max === null) {
+    if (viewMode === 'recorded') {
       return [];
     }
-
-    const minDate = new Date(Math.min(...stocksData.map((item) => new Date(item.date).getTime())));
-    const maxDate = new Date(Math.max(...stocksData.map((item) => new Date(item.date).getTime())));
-    const rangeStart = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
-
-    return data.filter((item) => {
-      const itemDate = new Date(item.date);
-      return itemDate >= rangeStart && itemDate <= maxDate;
-    });
-  } else if (viewMode === 'next2years' || viewMode === 'next5years') {
-    // Show recorded data + next years (limit to exactly N years after last stock data)
-    const stocksData = data.filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
-    if (stocksData.length > 0) {
-      const lastStockDate = new Date(stocksData[stocksData.length - 1].date);
-      const yearsToAdd = viewMode === 'next5years' ? 5 : 2;
-      const futureDate = new Date(lastStockDate);
-      futureDate.setFullYear(futureDate.getFullYear() + yearsToAdd);
-      // Only show data up to the target date after the last stock data point
-      return data.filter(item => {
-        const itemDate = new Date(item.date);
-        return itemDate <= futureDate;
-      });
-    } else {
-      return data;
-    }
-  } else {
-    // Show full range
     return data;
   }
+
+  return data.filter((item) => {
+    const itemDate = item.date;
+    if (!(itemDate instanceof Date) || Number.isNaN(itemDate.getTime())) return false;
+    if (range.min && itemDate < range.min) return false;
+    if (range.max && itemDate > range.max) return false;
+    return true;
+  });
 }
 
 /**

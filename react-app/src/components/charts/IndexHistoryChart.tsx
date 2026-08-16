@@ -1,8 +1,11 @@
 import React from 'react';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
-import type { IndexHistoryChartProps, Event } from '../../types';
+import type { IndexHistoryChartProps, IndexDataPoint, TrendStats } from '../../types';
 import { APP_CONFIG } from '../../config/app-config';
 import { ChartLegend } from './ChartLegend';
+import { getChartDateRange } from '../../utils/data-processing-utils';
+import { usePrivacyMode } from '../../hooks/use-privacy-mode';
+import { PRIVACY_DATE_MASK } from '../../utils/privacy-utils';
 
 type ChartRow = {
   date: Date;
@@ -33,6 +36,48 @@ interface IndexBounds {
   max: number;
 }
 
+type SigmaZone = 'above' | 'within' | 'below' | 'unknown';
+
+interface SigmaPosition {
+  deviation: number | null;
+  zone: SigmaZone;
+}
+
+interface SigmaRegimeSegment {
+  startPercent: number;
+  widthPercent: number;
+  dateLabel: string;
+  zone: SigmaZone;
+  deviation: number | null;
+}
+
+const SIGMA_ZONE_PRESENTATION: Record<SigmaZone, {
+  icon: string;
+  label: string;
+  color: string;
+}> = {
+  above: {
+    icon: '▲',
+    label: 'Above +1σ',
+    color: '#fb7185',
+  },
+  within: {
+    icon: '●',
+    label: 'Within ±1σ',
+    color: '#94a3b8',
+  },
+  below: {
+    icon: '▼',
+    label: 'Below −1σ',
+    color: '#22d3ee',
+  },
+  unknown: {
+    icon: '—',
+    label: 'Band unavailable',
+    color: '#64748b',
+  },
+};
+
 const toDateKey = (date: Date): string => {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -44,7 +89,9 @@ const formatDateWithDayUtc = (date: Date): string => {
   return toDateKey(date);
 };
 
-const formatLabelDateShort = (label: unknown): string => {
+const formatLabelDateShort = (label: unknown, maskExactDate = false): string => {
+  if (maskExactDate) return PRIVACY_DATE_MASK;
+
   if (typeof label === 'number' && Number.isFinite(label)) {
     return toDateKey(new Date(label));
   }
@@ -89,25 +136,6 @@ const formatValue = (value: number): string => {
 
 const formatPercent = (value: number): string => `${Math.round(value)} %`;
 
-const getStocksRange = (stocksData: Event[], viewMode: IndexHistoryChartProps['viewMode']): { min: Date; max: Date } | null => {
-  if (!stocksData || stocksData.length === 0) return null;
-  const stocksWithData = stocksData.filter((item) => item.stocks_in_eur && parseFloat(item.stocks_in_eur.toString()) > 0);
-  if (stocksWithData.length === 0) return null;
-
-  const minDate = new Date(Math.min(...stocksWithData.map((item) => item.date.getTime())));
-  const maxDate = new Date(Math.max(...stocksWithData.map((item) => item.date.getTime())));
-
-  const minMonth = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
-  let maxMonth = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
-
-  if (viewMode === 'next2years' || viewMode === 'next5years') {
-    const yearsToAdd = viewMode === 'next5years' ? 5 : 2;
-    maxMonth = new Date(maxDate.getFullYear() + yearsToAdd, maxDate.getMonth() + 2, 0);
-  }
-
-  return { min: minMonth, max: maxMonth };
-};
-
 const normalizeValue = (value: number | null | undefined, bounds: IndexBounds | null): number | null => {
   if (typeof value !== 'number' || !Number.isFinite(value) || !bounds) return null;
   if (bounds.max === bounds.min) return 50;
@@ -118,17 +146,118 @@ const normalizeValue = (value: number | null | undefined, bounds: IndexBounds | 
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
+const getSigmaPosition = (
+  value: unknown,
+  trend: unknown,
+  standardDeviation: unknown
+): SigmaPosition => {
+  if (
+    !isFiniteNumber(value)
+    || !isFiniteNumber(trend)
+    || !isFiniteNumber(standardDeviation)
+    || value <= 0
+    || trend <= 0
+    || standardDeviation <= 0
+  ) {
+    return { deviation: null, zone: 'unknown' };
+  }
+
+  const deviation = Math.log(value / trend) / standardDeviation;
+  if (!Number.isFinite(deviation)) {
+    return { deviation: null, zone: 'unknown' };
+  }
+
+  if (deviation > 1) return { deviation, zone: 'above' };
+  if (deviation < -1) return { deviation, zone: 'below' };
+  return { deviation, zone: 'within' };
+};
+
+const formatSigmaDeviation = (deviation: number | null): string => {
+  if (deviation === null || !Number.isFinite(deviation)) return 'N/A';
+  return `${deviation >= 0 ? '+' : ''}${deviation.toFixed(2)} σ`;
+};
+
+const getLatestTrendPoint = (points: IndexDataPoint[]): IndexDataPoint | null => {
+  return points.reduce<IndexDataPoint | null>((latest, point) => {
+    const pointDate = new Date(point.date);
+    if (
+      Number.isNaN(pointDate.getTime())
+      || !isFiniteNumber(point.value)
+      || point.value <= 0
+      || !isFiniteNumber(point.trend)
+      || point.trend <= 0
+    ) {
+      return latest;
+    }
+
+    if (!latest || pointDate.getTime() > new Date(latest.date).getTime()) {
+      return point;
+    }
+    return latest;
+  }, null);
+};
+
+const buildSigmaRegimeSegments = (
+  points: IndexDataPoint[],
+  trendStats: TrendStats | null,
+  domainStart: number,
+  domainEnd: number
+): SigmaRegimeSegment[] => {
+  if (!trendStats || !Number.isFinite(domainStart) || !Number.isFinite(domainEnd) || domainEnd <= domainStart) {
+    return [];
+  }
+
+  const visiblePoints = points
+    .map((point) => ({ point, date: new Date(point.date) }))
+    .filter(({ point, date }) => (
+      !Number.isNaN(date.getTime())
+      && date.getTime() >= domainStart
+      && date.getTime() <= domainEnd
+      && isFiniteNumber(point.value)
+      && isFiniteNumber(point.trend)
+    ))
+    .sort((left, right) => left.date.getTime() - right.date.getTime());
+
+  return visiblePoints.map(({ point, date }, index) => {
+    const currentTime = date.getTime();
+    const previousTime = visiblePoints[index - 1]?.date.getTime() ?? null;
+    const nextTime = visiblePoints[index + 1]?.date.getTime() ?? null;
+    const start = previousTime === null
+      ? Math.max(domainStart, currentTime - ((nextTime ?? currentTime) - currentTime) / 2)
+      : (previousTime + currentTime) / 2;
+    const end = nextTime === null
+      ? Math.min(domainEnd, currentTime + (currentTime - (previousTime ?? currentTime)) / 2)
+      : (currentTime + nextTime) / 2;
+    const sigmaPosition = getSigmaPosition(
+      point.value,
+      point.trend,
+      trendStats.standardDeviation
+    );
+
+    return {
+      startPercent: ((start - domainStart) / (domainEnd - domainStart)) * 100,
+      widthPercent: Math.max(0, ((end - start) / (domainEnd - domainStart)) * 100),
+      dateLabel: toDateKey(date),
+      zone: sigmaPosition.zone,
+      deviation: sigmaPosition.deviation,
+    };
+  });
+};
+
 export function IndexHistoryChart({
   title,
   indexDataBySymbol,
   indexTrendStatsBySymbol,
   onFetchIndexData,
   loading,
-  showOnlyDataWithStocks,
   stocksData,
+  config,
   viewMode,
   indexError,
+  indexNotice,
 }: IndexHistoryChartProps): React.JSX.Element {
+  const { isPrivacyMode } = usePrivacyMode();
+  const maskUserDerivedRangeDates = isPrivacyMode && viewMode !== 'full';
   const [showSourceLinks, setShowSourceLinks] = React.useState(false);
   const [visibleSymbols, setVisibleSymbols] = React.useState<Record<string, boolean>>(() => {
     const initialVisibility: Record<string, boolean> = {};
@@ -168,24 +297,27 @@ export function IndexHistoryChart({
   }, []);
 
   const filteredDataBySymbol = React.useMemo(() => {
-    const range = showOnlyDataWithStocks ? getStocksRange(stocksData, viewMode) : null;
+    const range = getChartDateRange(stocksData, config, viewMode);
     const result: Record<string, typeof indexDataBySymbol[string]> = {};
 
-    for (const config of APP_CONFIG.API.INDEX_SERIES) {
-      const rawSeries = indexDataBySymbol[config.symbol] ?? [];
-      if (!range) {
-        result[config.symbol] = rawSeries;
+    for (const indexDefinition of APP_CONFIG.API.INDEX_SERIES) {
+      const rawSeries = indexDataBySymbol[indexDefinition.symbol] ?? [];
+      if (range.min === null && range.max === null) {
+        result[indexDefinition.symbol] = rawSeries;
         continue;
       }
 
-      result[config.symbol] = rawSeries.filter((item) => {
+      result[indexDefinition.symbol] = rawSeries.filter((item) => {
         const itemDate = new Date(item.date);
-        return itemDate >= range.min && itemDate <= range.max;
+        if (Number.isNaN(itemDate.getTime())) return false;
+        if (range.min && itemDate < range.min) return false;
+        if (range.max && itemDate > range.max) return false;
+        return true;
       });
     }
 
     return result;
-  }, [indexDataBySymbol, showOnlyDataWithStocks, stocksData, viewMode]);
+  }, [config, indexDataBySymbol, stocksData, viewMode]);
 
   const boundsBySymbol = React.useMemo((): Record<string, IndexBounds | null> => {
     const result: Record<string, IndexBounds | null> = {};
@@ -259,26 +391,21 @@ export function IndexHistoryChart({
   const latestMetrics = React.useMemo(() => {
     return seriesConfigs
       .map((config) => {
-        const points = filteredDataBySymbol[config.symbol] ?? [];
-        if (points.length === 0) return null;
-        const latestPoint = points.reduce((latest, point) => (point.date > latest.date ? point : latest), points[0]);
+        // Current status must describe the newest fetched market observation,
+        // even when the chart viewport is cropped to an earlier user range.
+        const latestPoint = getLatestTrendPoint(indexDataBySymbol[config.symbol] ?? []);
+        if (!latestPoint) return null;
         const trendStats = indexTrendStatsBySymbol[config.symbol] ?? null;
-        const value = latestPoint.value ?? null;
-        const trend = latestPoint.trend ?? null;
-        const trendLowerBound = latestPoint.trendLowerBound ?? null;
-        const sigmaAbs = trend !== null && trendLowerBound !== null ? trend - trendLowerBound : null;
-        const diffPct = value !== null && trend !== null && trend !== 0 ? ((value - trend) / trend) * 100 : null;
-        const sigmasFromTrend = value !== null && trend !== null && sigmaAbs !== null && sigmaAbs !== 0
-          ? (value - trend) / sigmaAbs
-          : null;
+        const value = latestPoint.value as number;
+        const trend = latestPoint.trend as number;
+        const diffPct = ((value - trend) / trend) * 100;
+        const sigmaPosition = getSigmaPosition(value, trend, trendStats?.standardDeviation);
 
         let todayMinusOneSigmaLevel: number | null = null;
-        let todayMinusOneSigmaDelta: number | null = null;
         if (
           config.symbol === APP_CONFIG.API.EUNL_SYMBOL
           && trendStats
-          && trend !== null
-          && Number.isFinite(trend)
+          && trendStats.standardDeviation > 0
         ) {
           const latestPointDate = new Date(latestPoint.date);
           const todayStartUtc = getTodayStartUtc();
@@ -289,11 +416,9 @@ export function IndexHistoryChart({
             );
             const dailyGrowthRate = trendStats.annualGrowthRate / 365;
             const projectedTodayTrend = trend * Math.exp(dailyGrowthRate * daysFromLatestToToday);
-            const projectedTodayDelta = projectedTodayTrend * trendStats.standardDeviation;
-            const projectedTodayLowerBound = Math.max(0, projectedTodayTrend - projectedTodayDelta);
+            const projectedTodayLowerBound = projectedTodayTrend * Math.exp(-trendStats.standardDeviation);
 
-            if (Number.isFinite(projectedTodayDelta) && Number.isFinite(projectedTodayLowerBound)) {
-              todayMinusOneSigmaDelta = projectedTodayDelta;
+            if (Number.isFinite(projectedTodayLowerBound)) {
               todayMinusOneSigmaLevel = projectedTodayLowerBound;
             }
           }
@@ -303,14 +428,14 @@ export function IndexHistoryChart({
           config,
           trendStats,
           diffPct,
-          sigmasFromTrend,
+          sigmaPosition,
           multiplier: latestPoint.multiplier ?? null,
+          latestDate: new Date(latestPoint.date),
           todayMinusOneSigmaLevel,
-          todayMinusOneSigmaDelta,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [filteredDataBySymbol, indexTrendStatsBySymbol, seriesConfigs]);
+  }, [indexDataBySymbol, indexTrendStatsBySymbol, seriesConfigs]);
 
   const todayLabel = formatDateWithDayUtc(getTodayStartUtc());
 
@@ -319,14 +444,37 @@ export function IndexHistoryChart({
     [seriesConfigs, visibleSymbols]
   );
 
+  const sigmaRegimeRows = React.useMemo(() => {
+    if (chartData.length < 2) return [];
+    const domainStart = chartData[0].dateTs;
+    const domainEnd = chartData[chartData.length - 1].dateTs;
+
+    return visibleSeriesConfigs
+      .map((config) => ({
+        config,
+        segments: buildSigmaRegimeSegments(
+          filteredDataBySymbol[config.symbol] ?? [],
+          indexTrendStatsBySymbol[config.symbol] ?? null,
+          domainStart,
+          domainEnd
+        ),
+      }))
+      .filter((row) => row.segments.length > 0);
+  }, [chartData, filteredDataBySymbol, indexTrendStatsBySymbol, visibleSeriesConfigs]);
+
   const legendItems = React.useMemo(() => {
     return [
       ...seriesConfigs.map((config) => ({
         label: config.shortLabel,
-        description: `${config.displayName}. Solid: index value; dashed: trend; dotted: ±1 σ.`,
+        description: `${config.displayName}. Solid: index value; dashed: fitted historical trend; dotted: ±1σ historical trend band.`,
         color: config.color,
         variant: 'line' as const,
       })),
+      {
+        label: 'Historical σ zones',
+        description: '▲ above +1σ; ● within the historical trend band; ▼ below −1σ. The band describes past variation around the fitted trend, not a forecast probability.',
+        variant: 'note' as const,
+      },
       {
         label: 'Normalized scale (0 to 100 %)',
         description: 'Each index is scaled from its own minimum to maximum values for easier comparison.',
@@ -346,6 +494,7 @@ export function IndexHistoryChart({
 
   const yahooSeries = APP_CONFIG.API.INDEX_SERIES.filter((series) => series.source === 'yahoo');
   const morningstarSeries = APP_CONFIG.API.INDEX_SERIES.filter((series) => series.source === 'morningstar');
+  const visibleLatestMetrics = latestMetrics.filter(({ config }) => visibleSymbols[config.symbol]);
 
   const renderSourceLinksToggle = (): React.JSX.Element => {
     return (
@@ -409,7 +558,7 @@ export function IndexHistoryChart({
               disabled={loading}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
-              {loading ? 'Fetching...' : 'Fetch all indexes'}
+              {loading ? 'Refreshing...' : 'Refresh indexes'}
             </button>
           )}
         </div>
@@ -438,6 +587,48 @@ export function IndexHistoryChart({
         })}
       </div>
 
+      {visibleLatestMetrics.length > 0 && (
+        <div
+          className="mb-3 flex flex-wrap gap-1.5 text-xs"
+          aria-label="Latest index sigma positions"
+        >
+          {visibleLatestMetrics.map(({ config, sigmaPosition, latestDate }) => {
+            const presentation = SIGMA_ZONE_PRESENTATION[sigmaPosition.zone];
+            const dateLabel = formatDateWithDayUtc(latestDate);
+            return (
+              <div
+                key={`sigma-badge-${config.symbol}`}
+                data-testid={`sigma-badge-${config.symbol}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-2 py-1"
+                aria-label={`${config.shortLabel}: ${presentation.label}, ${formatSigmaDeviation(sigmaPosition.deviation)}, latest observation ${dateLabel}`}
+                title={`Latest observation: ${dateLabel}`}
+              >
+                <span className="font-semibold" style={{ color: config.color }}>
+                  {config.shortLabel}
+                </span>
+                <span aria-hidden="true" style={{ color: presentation.color }}>
+                  {presentation.icon}
+                </span>
+                <span>{presentation.label}</span>
+                <span className="font-mono text-foreground">
+                  {formatSigmaDeviation(sigmaPosition.deviation)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {indexNotice && !indexError && (
+        <div
+          role="status"
+          className="mb-3 flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/90 px-2.5 py-1.5 text-xs text-white"
+        >
+          <span aria-hidden="true" className="text-sm">ⓘ</span>
+          <span><span className="font-semibold">Notice:</span> {indexNotice}</span>
+        </div>
+      )}
+
       {indexError && (
         <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {indexError}
@@ -447,8 +638,8 @@ export function IndexHistoryChart({
       {!hasData ? (
         <div className="flex items-center justify-center h-[300px] text-muted-foreground">
           <div className="text-center">
-            <p>No index data loaded</p>
-            <p className="text-sm">Click "Fetch all indexes" to load historical data</p>
+            <p>{loading ? 'Loading index data...' : 'No index data loaded'}</p>
+            {!loading && <p className="text-sm">Use "Refresh indexes" to try again</p>}
           </div>
         </div>
       ) : (
@@ -460,7 +651,7 @@ export function IndexHistoryChart({
               type="number"
               scale="time"
               domain={['dataMin', 'dataMax']}
-              tickFormatter={(value) => formatLabelDateShort(value)}
+              tickFormatter={(value) => formatLabelDateShort(value, maskUserDerivedRangeDates)}
               tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
               axisLine={{ stroke: 'hsl(var(--border))' }}
             />
@@ -483,7 +674,7 @@ export function IndexHistoryChart({
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null;
                 const row = payload[0]?.payload as ChartRow;
-                const labelDate = formatLabelDateShort(label);
+                const labelDate = formatLabelDateShort(label, maskUserDerivedRangeDates);
                 return (
                   <div className="rounded-lg border bg-popover p-3 shadow-md">
                     <p className="mb-2 font-medium">{`Date: ${labelDate}`}</p>
@@ -496,6 +687,12 @@ export function IndexHistoryChart({
                         const lower = row[config.lowerKey];
                         const multiplier = row[config.multiplierKey];
                         const normalizedValue = row[config.normalizedValueKey];
+                        const sigmaPosition = getSigmaPosition(
+                          value,
+                          trend,
+                          indexTrendStatsBySymbol[config.symbol]?.standardDeviation
+                        );
+                        const sigmaPresentation = SIGMA_ZONE_PRESENTATION[sigmaPosition.zone];
                         return (
                           <div key={`tooltip-${config.symbol}`} className="rounded border border-border/50 p-2">
                             <div className="font-semibold" style={{ color: config.color }}>{config.shortLabel}</div>
@@ -506,7 +703,14 @@ export function IndexHistoryChart({
                               <span className="text-right">{formatValue(value)}</span>
                               <span className="text-muted-foreground">Trend:</span>
                               <span className="text-right">{typeof trend === 'number' ? formatValue(trend) : 'N/A'}</span>
-                              <span className="text-muted-foreground">±1 σ:</span>
+                              <span className="text-muted-foreground">Deviation:</span>
+                              <span className="text-right">{formatSigmaDeviation(sigmaPosition.deviation)}</span>
+                              <span className="text-muted-foreground">Zone:</span>
+                              <span className="text-right" style={{ color: sigmaPresentation.color }}>
+                                <span aria-hidden="true">{sigmaPresentation.icon} </span>
+                                {sigmaPresentation.label}
+                              </span>
+                              <span className="text-muted-foreground">Historical band:</span>
                               <span className="text-right">
                                 {typeof upper === 'number' && typeof lower === 'number'
                                   ? `${formatValue(upper)} / ${formatValue(lower)}`
@@ -576,58 +780,146 @@ export function IndexHistoryChart({
         </ResponsiveContainer>
       )}
 
+      {sigmaRegimeRows.length > 0 && (
+        <div
+          className="mt-2 rounded border border-border/50 bg-card/40 px-2 py-1.5"
+          aria-label="Historical sigma zones"
+          data-testid="sigma-regime-strip"
+        >
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="font-medium text-foreground">Historical σ zones</span>
+            <span className="flex flex-wrap gap-x-2">
+              <span><span aria-hidden="true" style={{ color: SIGMA_ZONE_PRESENTATION.above.color }}>▲</span> above +1σ</span>
+              <span><span aria-hidden="true" style={{ color: SIGMA_ZONE_PRESENTATION.within.color }}>●</span> within</span>
+              <span><span aria-hidden="true" style={{ color: SIGMA_ZONE_PRESENTATION.below.color }}>▼</span> below −1σ</span>
+            </span>
+          </div>
+          <div className="space-y-1">
+            {sigmaRegimeRows.map(({ config, segments }) => (
+              <div key={`sigma-regime-${config.symbol}`} className="flex items-center">
+                <svg
+                  className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-sm bg-slate-700/20"
+                  viewBox="0 0 100 8"
+                  preserveAspectRatio="none"
+                  role="img"
+                  aria-label={`${config.shortLabel} historical sigma zones`}
+                  data-testid={`sigma-regime-${config.symbol}`}
+                >
+                  {segments.map((segment, index) => {
+                    const presentation = SIGMA_ZONE_PRESENTATION[segment.zone];
+                    const segmentEnd = segment.startPercent + segment.widthPercent;
+                    return (
+                      <React.Fragment key={`${config.symbol}-${segment.dateLabel}-${index}`}>
+                        <rect
+                          x={segment.startPercent}
+                          y={0}
+                          width={segment.widthPercent}
+                          height={8}
+                          fill={presentation.color}
+                          fillOpacity={segment.zone === 'within' ? 0.28 : segment.zone === 'unknown' ? 0.15 : 0.72}
+                          data-zone={segment.zone}
+                        >
+                          <title>{`${maskUserDerivedRangeDates ? PRIVACY_DATE_MASK : segment.dateLabel}: ${presentation.label}, ${formatSigmaDeviation(segment.deviation)}`}</title>
+                        </rect>
+                        {segment.zone === 'above' && (
+                          <line
+                            x1={segment.startPercent}
+                            x2={segmentEnd}
+                            y1={1}
+                            y2={1}
+                            stroke="white"
+                            strokeOpacity={0.75}
+                            strokeWidth={0.55}
+                            aria-hidden="true"
+                          />
+                        )}
+                        {segment.zone === 'below' && (
+                          <line
+                            x1={segment.startPercent}
+                            x2={segmentEnd}
+                            y1={7}
+                            y2={7}
+                            stroke="white"
+                            strokeOpacity={0.75}
+                            strokeWidth={0.55}
+                            aria-hidden="true"
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </svg>
+                <span className="w-14 pl-2 text-right text-[10px] font-semibold" style={{ color: config.color }}>
+                  {config.shortLabel}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <ChartLegend items={legendItems} controls={renderSourceLinksToggle()} />
       {renderSourceLinksPanel()}
 
       {latestMetrics.length > 0 && (
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-2 text-sm text-muted-foreground">
-          {latestMetrics.map(({ config, trendStats, diffPct, sigmasFromTrend, multiplier, todayMinusOneSigmaLevel, todayMinusOneSigmaDelta }) => (
-            <div key={`metrics-${config.symbol}`} className="rounded border border-border/50 px-3 py-2">
-              <div className="font-semibold" style={{ color: config.color }}>
-                {config.shortLabel}
-              </div>
-              <div>
-                Trend:{' '}
-                <span className="font-semibold text-foreground">
-                  {trendStats ? `${(trendStats.annualGrowthRate * 100).toFixed(1)} %` : 'N/A'}
-                </span>{' '}
-                (
-                <span className="font-semibold text-foreground">
-                  {trendStats ? `+/- ${(trendStats.standardDeviation * 100).toFixed(1)} %` : 'N/A'}
-                </span>
-                )
-              </div>
-              <div>
-                Latest vs trend:{' '}
-                <span className="font-semibold text-foreground">
-                  {typeof diffPct === 'number' && Number.isFinite(diffPct) ? `${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(2)} %` : 'N/A'}
-                </span>{' '}
-                (
-                <span className="font-semibold text-foreground">
-                  {typeof sigmasFromTrend === 'number' && Number.isFinite(sigmasFromTrend)
-                    ? `${sigmasFromTrend >= 0 ? '+' : ''}${sigmasFromTrend.toFixed(2)} σ`
-                    : 'N/A'}
-                </span>
-                )
-              </div>
-              <div>
-                Multiplier:{' '}
-                <span className="font-semibold text-foreground">
-                  {typeof multiplier === 'number' && Number.isFinite(multiplier) ? `${multiplier.toFixed(3)}x` : 'N/A'}
-                </span>
-              </div>
-              {config.symbol === APP_CONFIG.API.EUNL_SYMBOL && (
-                <div>
-                  Today -σ ({todayLabel}):{' '}
-                  <span className="font-semibold text-foreground">
-                    {typeof todayMinusOneSigmaLevel === 'number' && Number.isFinite(todayMinusOneSigmaLevel)
-                      ? formatValue(todayMinusOneSigmaLevel)
-                      : 'N/A'}
-                  </span>{' '}€
+          {latestMetrics.map(({ config, trendStats, diffPct, sigmaPosition, multiplier, todayMinusOneSigmaLevel }) => {
+            const presentation = SIGMA_ZONE_PRESENTATION[sigmaPosition.zone];
+            const historicalBand = trendStats
+              ? `−${((1 - Math.exp(-trendStats.standardDeviation)) * 100).toFixed(1)} % / +${((Math.exp(trendStats.standardDeviation) - 1) * 100).toFixed(1)} %`
+              : 'N/A';
+            return (
+              <div key={`metrics-${config.symbol}`} className="rounded border border-border/50 px-3 py-2">
+                <div className="font-semibold" style={{ color: config.color }}>
+                  {config.shortLabel}
                 </div>
-              )}
-            </div>
-          ))}
+                <div>
+                  Trend:{' '}
+                  <span className="font-semibold text-foreground">
+                    {trendStats ? `${(trendStats.annualGrowthRate * 100).toFixed(1)} %` : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  Historical ±1σ band:{' '}
+                  <span className="font-semibold text-foreground">{historicalBand}</span>
+                </div>
+                <div>
+                  Latest vs trend:{' '}
+                  <span className="font-semibold text-foreground">
+                    {Number.isFinite(diffPct) ? `${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(2)} %` : 'N/A'}
+                  </span>{' '}
+                  (
+                  <span className="font-semibold text-foreground">
+                    {formatSigmaDeviation(sigmaPosition.deviation)}
+                  </span>
+                  )
+                </div>
+                <div>
+                  Zone:{' '}
+                  <span className="font-semibold" style={{ color: presentation.color }}>
+                    <span aria-hidden="true">{presentation.icon} </span>
+                    {presentation.label}
+                  </span>
+                </div>
+                <div>
+                  Multiplier:{' '}
+                  <span className="font-semibold text-foreground">
+                    {typeof multiplier === 'number' && Number.isFinite(multiplier) ? `${multiplier.toFixed(3)}x` : 'N/A'}
+                  </span>
+                </div>
+                {config.symbol === APP_CONFIG.API.EUNL_SYMBOL && (
+                  <div>
+                    Today −1σ ({todayLabel}):{' '}
+                    <span className="font-semibold text-foreground">
+                      {typeof todayMinusOneSigmaLevel === 'number' && Number.isFinite(todayMinusOneSigmaLevel)
+                        ? formatValue(todayMinusOneSigmaLevel)
+                        : 'N/A'}
+                    </span>{' '}€
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

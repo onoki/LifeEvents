@@ -22,3 +22,10 @@ These are project-wide invariants. Apply them to every relevant change unless th
 - A series must use the same short name in its chart tooltip and its expanded legend.
 - Matching series shown in multiple charts must use matching colors and visual conventions.
 - Include visible markers and annotations when calculating chart domains so they are not clipped.
+- Keep the shared date presets as Recorded, Next 2 years (anchored to today), Planned end plus 1 year, and Full range. Non-Full index views begin with the user's owned-stock period; Full range alone shows all fetched index history.
+
+## Index history
+
+- Load indexes automatically through the configured Vercel endpoint only. Automatic failures stay quiet and must not start legacy public proxies; manual Refresh indexes may use the retained fallback.
+- Fit the exponential historical trend in log space. The historical ±1σ band is `trend * exp(±σ)`, and sigma position is `ln(value / trend) / σ`; do not describe this residual band as a confidence interval or return volatility.
+- Calculate trend statistics and the latest sigma status from the full fetched series, independently of the visible X range. Calculate historical highlighting from raw values rather than normalized chart coordinates.

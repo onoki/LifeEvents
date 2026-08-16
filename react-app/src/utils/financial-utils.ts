@@ -481,60 +481,97 @@ export function processStocksData(data: Event[]): ChartDataPoint[] {
 }
 
 /**
- * Calculate exponential trend line for index data with confidence intervals.
+ * Calculate an exponential trend line and a historical ±1σ residual band.
+ *
+ * The regression and residual dispersion are calculated in log space, so the
+ * band is multiplicative: trend * exp(±σ). It describes how the recorded
+ * index has varied around its fitted historical path; it is not a confidence
+ * interval for the fitted mean or a forecast probability.
  * Supports both `value` and legacy `price` fields.
  */
 export function calculateExponentialTrend(data: any[]): { data: any[], trendStats: { annualGrowthRate: number, standardDeviation: number } | null } {
-  if (!data || data.length < 2) return { data, trendStats: null };
+  if (!Array.isArray(data) || data.length < 3) return { data, trendStats: null };
 
-  // Convert dates to numeric values (days since first date)
-  const firstDate = data[0].date;
-  const numericData = data.map((item) => ({
-    ...item,
-    x: (item.date.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24), // days since first date
-    y: item.value ?? item.price
-  })).filter(item => item.y !== null);
+  const validData = data
+    .map((item) => {
+      const date = item?.date instanceof Date ? item.date : new Date(item?.date);
+      const value = item?.value ?? item?.price;
+      return {
+        date,
+        dateMs: date.getTime(),
+        value,
+      };
+    })
+    .filter((item) => (
+      !Number.isNaN(item.dateMs)
+      && typeof item.value === 'number'
+      && Number.isFinite(item.value)
+      && item.value > 0
+    ));
 
-  if (numericData.length < 2) return { data, trendStats: null };
+  // Two fitted parameters (intercept and slope) leave no residual degrees of
+  // freedom with fewer than three observations.
+  if (validData.length < 3) return { data, trendStats: null };
 
-  // Calculate exponential regression: y = a * e^(b * x)
-  // Using linear regression on ln(y) = ln(a) + b * x
+  const firstDateMs = Math.min(...validData.map((item) => item.dateMs));
+  const numericData = validData.map((item) => ({
+    x: (item.dateMs - firstDateMs) / (1000 * 60 * 60 * 24),
+    logY: Math.log(item.value),
+  }));
+
+  // Calculate exponential regression y = a * e^(b*x) by fitting
+  // ln(y) = ln(a) + b*x.
   const n = numericData.length;
   const sumX = numericData.reduce((sum, item) => sum + item.x, 0);
-  const sumY = numericData.reduce((sum, item) => sum + Math.log(item.y), 0);
-  const sumXY = numericData.reduce((sum, item) => sum + item.x * Math.log(item.y), 0);
+  const sumY = numericData.reduce((sum, item) => sum + item.logY, 0);
+  const sumXY = numericData.reduce((sum, item) => sum + item.x * item.logY, 0);
   const sumXX = numericData.reduce((sum, item) => sum + item.x * item.x, 0);
+  const denominator = n * sumXX - sumX * sumX;
 
-  const b = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  if (!Number.isFinite(denominator) || Math.abs(denominator) <= Number.EPSILON) {
+    return { data, trendStats: null };
+  }
+
+  const b = (n * sumXY - sumX * sumY) / denominator;
   const lnA = (sumY - b * sumX) / n;
-  const a = Math.exp(lnA);
+  if (!Number.isFinite(b) || !Number.isFinite(lnA)) {
+    return { data, trendStats: null };
+  }
 
-  // Calculate residuals for standard deviation
-  const residuals = numericData.map(item => {
-    const predicted = Math.log(a * Math.exp(b * item.x));
-    const actual = Math.log(item.y);
-    return Math.pow(actual - predicted, 2);
-  });
+  const sumSquaredResiduals = numericData.reduce((sum, item) => {
+    const residual = item.logY - (lnA + b * item.x);
+    return sum + residual * residual;
+  }, 0);
+  const standardDeviation = Math.sqrt(sumSquaredResiduals / (n - 2));
+  const annualGrowthRate = b * 365;
 
-  // Calculate standard deviation of residuals
-  const sumSquaredResiduals = residuals.reduce((sum, residual) => sum + residual, 0);
-  const standardDeviation = Math.sqrt(sumSquaredResiduals / (n - 2)); // n-2 for degrees of freedom
+  if (!Number.isFinite(standardDeviation) || !Number.isFinite(annualGrowthRate)) {
+    return { data, trendStats: null };
+  }
 
-  // Calculate annual growth rate from daily growth rate (b)
-  const annualGrowthRate = b * 365; // Convert daily growth rate to annual
+  const upperMultiplier = Math.exp(standardDeviation);
+  const lowerMultiplier = Math.exp(-standardDeviation);
 
-  // Generate trend line data with confidence intervals
-  const enhancedData = data.map(item => {
-    const x = (item.date.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
-    const trend = a * Math.exp(b * x);
-    
-    // Calculate confidence intervals (±1 standard deviation)
-    const confidenceInterval = standardDeviation * trend;
-    const upperBound = trend + confidenceInterval;
-    const lowerBound = Math.max(0, trend - confidenceInterval); // Don't go below 0 for prices
-    const observedValue = item.value ?? item.price;
-    const multiplier = observedValue ? trend / observedValue : null;
-    
+  const enhancedData = data.map((item) => {
+    const date = item?.date instanceof Date ? item.date : new Date(item?.date);
+    const dateMs = date.getTime();
+    const observedValue = item?.value ?? item?.price;
+    if (
+      Number.isNaN(dateMs)
+      || typeof observedValue !== 'number'
+      || !Number.isFinite(observedValue)
+      || observedValue <= 0
+    ) {
+      return item;
+    }
+
+    const x = (dateMs - firstDateMs) / (1000 * 60 * 60 * 24);
+    const trend = Math.exp(lnA + b * x);
+    const upperBound = trend * upperMultiplier;
+    const lowerBound = trend * lowerMultiplier;
+    const logDeviation = Math.log(observedValue / trend);
+    const multiplier = trend / observedValue;
+
     return {
       ...item,
       value: observedValue,
@@ -542,9 +579,8 @@ export function calculateExponentialTrend(data: any[]): { data: any[], trendStat
       trendUpperBound: upperBound,
       trendLowerBound: lowerBound,
       multiplier,
-      // Add indicators for when price is outside confidence interval
-      isAboveUpperBound: observedValue !== null && observedValue > upperBound,
-      isBelowLowerBound: observedValue !== null && observedValue < lowerBound
+      isAboveUpperBound: logDeviation > standardDeviation,
+      isBelowLowerBound: logDeviation < -standardDeviation,
     };
   });
 
@@ -552,8 +588,8 @@ export function calculateExponentialTrend(data: any[]): { data: any[], trendStat
     data: enhancedData,
     trendStats: {
       annualGrowthRate,
-      standardDeviation
-    }
+      standardDeviation,
+    },
   };
 }
 

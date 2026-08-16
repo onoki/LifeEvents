@@ -7,7 +7,7 @@ Life Events KPI Tracker is a React + TypeScript web app for tracking life events
 - KPI cards for work progress, focused savings, and retirement.
 - Stock value chart with target lines, growth scenarios, and reward milestones.
 - Minimum required contribution and planned contribution projections.
-- Multi-index history with trend and confidence bands (EUNL from Yahoo Finance plus Morningstar indexes).
+- Multi-index history with fitted trends and historical ±1σ bands (EUNL from Yahoo Finance plus Morningstar indexes).
 - Privacy mode via a URL parameter.
 
 ## Tech stack
@@ -104,16 +104,18 @@ Default values, dates, and API endpoints live in `react-app/src/config/app-confi
 
 ## Optional Vercel index endpoint
 
-The production app can fetch index history through a small Vercel Function before
-trying the existing browser/direct/public-proxy implementation. The old flow has
-not been removed:
+The app fetches index history automatically through a small Vercel
+Function. The old browser/direct/public-proxy flow has not been removed:
 
-1. When `VITE_INDEX_API_URL` is configured, the app requests the Vercel endpoint.
-2. If Vercel fails completely, the existing implementation handles every index.
-3. If Vercel returns only some indexes, the existing implementation handles only
-   the missing ones.
-4. Removing `VITE_INDEX_API_URL` and rebuilding restores the previous behavior
-   immediately.
+1. On startup, the app requests all indexes from `VITE_INDEX_API_URL`. Automatic
+   loading is Vercel-only, so an upstream failure produces only a quiet notice and
+   never starts the slow public-proxy fallback.
+2. Complete automatic results are validated and reused from `sessionStorage` for
+   five minutes, while the Vercel CDN provides the longer shared response cache.
+3. The manual **Refresh indexes** action requests Vercel first and retains the
+   existing implementation as a fallback for failed or missing indexes.
+4. Removing `VITE_INDEX_API_URL` and rebuilding restores manual legacy fetching;
+   automatic loading then reports that index data is temporarily unavailable.
 
 The endpoint is intentionally not an open proxy. It accepts exactly one `symbol`
 parameter whose value must be `all`, `EUNL.DE`, `MSNA`, `MSDE`, or `MSDA`. Upstream

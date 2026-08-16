@@ -1,34 +1,52 @@
 import React from 'react';
-import type { ViewMode } from '../../types';
+import type { Config, ViewMode } from '../../types';
+import { isPlannedEndPlusOneYearAvailable } from '../../utils/data-processing-utils';
 
 interface ViewModeToggleProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  config?: Config;
+  now?: Date;
 }
 
 /**
  * View Mode Toggle Component
  * Allows users to switch between different data view modes
  */
-export function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeToggleProps): React.JSX.Element {
+export function ViewModeToggle({
+  viewMode,
+  onViewModeChange,
+  config,
+  now,
+}: ViewModeToggleProps): React.JSX.Element {
+  const plannedRangeAvailable = config
+    ? isPlannedEndPlusOneYearAvailable(config, now)
+    : false;
   const modes: Array<{ key: ViewMode; label: string }> = [
-    { key: 'recorded', label: 'Show only recorded range' },
-    { key: 'next2years', label: 'Show next 2 years' },
-    { key: 'next5years', label: 'Show next 5 years' },
-    { key: 'full', label: 'Show full range' },
+    { key: 'recorded', label: 'Recorded' },
+    { key: 'next2years', label: 'Next 2 years' },
+    ...(plannedRangeAvailable
+      ? [{ key: 'planned' as const, label: 'Planned end plus 1 year' }]
+      : []),
+    { key: 'full', label: 'Full range' },
   ];
+  const effectiveViewMode = viewMode === 'planned' && !plannedRangeAvailable
+    ? 'next2years'
+    : viewMode;
 
   return (
     <div className="flex items-center justify-center">
-      <div className="bg-card border border-gray-600 rounded-lg p-4">
-        <div className="flex items-center space-x-2">
+      <div className="w-full max-w-3xl bg-card border border-gray-600 rounded-lg p-2 sm:p-4">
+        <div className={`grid grid-cols-2 gap-2 ${plannedRangeAvailable ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
           {modes.map(({ key, label }) => (
             <button
               key={key}
+              type="button"
               onClick={() => onViewModeChange(key)}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                viewMode === key 
-                  ? 'bg-blue-600 text-white' 
+              aria-pressed={effectiveViewMode === key}
+              className={`min-h-9 w-full whitespace-normal px-2 py-1 rounded-md text-sm font-medium leading-tight transition-colors ${
+                effectiveViewMode === key
+                  ? 'bg-blue-600 text-white'
                   : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
               }`}
             >
