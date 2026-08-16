@@ -1,5 +1,10 @@
 // Application configuration constants
 export const APP_CONFIG = {
+  FEATURE_FLAGS: {
+    // Keep the card implementation available while hiding it from the KPI row.
+    SHOW_MINI_REWARDS_CARD: false,
+  },
+
   // Work schedule
   WORK_SCHEDULE: {
     START_HOUR: 8,
@@ -131,6 +136,7 @@ export const APP_CONFIG = {
 
 // Type definitions for configuration
 export type WorkSchedule = typeof APP_CONFIG.WORK_SCHEDULE;
+export type FeatureFlags = typeof APP_CONFIG.FEATURE_FLAGS;
 export type Dates = typeof APP_CONFIG.DATES;
 export type Vacation = typeof APP_CONFIG.VACATION;
 export type API = typeof APP_CONFIG.API;
