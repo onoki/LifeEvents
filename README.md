@@ -128,16 +128,16 @@ hosts, paths, query keys, and authorization headers are fixed server-side.
 3. Set **Root Directory** to `vercel-proxy` and leave the Framework Preset as
    **Other**. No build command, output directory, API key, or other secret is
    required.
-4. Deploy the project. Vercel will expose the function at a stable URL similar to:
+4. Deploy the project. The function is available at:
 
    ```text
-   https://YOUR-PROJECT.vercel.app/api/index-history
+   https://life-events-five.vercel.app/api/index-history
    ```
 
 5. Test it in a browser or terminal:
 
    ```bash
-   curl "https://YOUR-PROJECT.vercel.app/api/index-history?symbol=all"
+   curl "https://life-events-five.vercel.app/api/index-history?symbol=all"
    ```
 
 6. In GitHub, open **LifeEvents → Settings → Secrets and variables → Actions →
