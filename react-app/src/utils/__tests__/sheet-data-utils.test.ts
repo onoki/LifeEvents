@@ -62,7 +62,7 @@ describe('sheet data safety helpers', () => {
   });
 
   it('rejects non-network URLs and embedded credentials', () => {
-    ['javascript:alert(1)', 'data:text/plain,date%09stocks_in_eur', 'file:///tmp/data.tsv']
+    ['javascript:alert(1)', 'data:text/plain,investment_date%09stocks_in_eur', 'file:///tmp/data.tsv']
       .forEach((url) => {
         expect(() => normalizeFetchableTsvUrl(url)).toThrow('http:// or https://');
       });
@@ -83,7 +83,7 @@ describe('sheet data safety helpers', () => {
   });
 
   it('fetches a valid bounded TSV response without disabling intermediary caches', async () => {
-    const responseText = 'date\tstocks_in_eur\n2026-08-01\t1000';
+    const responseText = 'investment_date\tstocks_in_eur\n2026-08-01\t1000';
     const fetchMock = jest.fn(async () => mockTextResponse(responseText));
 
     await expect(fetchTsvText('https://example.com/data.tsv#ignored', {

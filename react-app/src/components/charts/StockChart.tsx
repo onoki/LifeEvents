@@ -22,7 +22,7 @@ const INDEX_MIN_COLOR = '#0284c7';
 const INDEX_PLANNED_COLOR = '#38bdf8';
 
 const formatAnnualRate = (rate: number): string =>
-  `${Math.round(rate * 1000) / 10} %`;
+  `${(rate * 100).toFixed(1)} %`;
 
 const parseAnnualRate = (value: string | undefined, fallback: number): number => {
   const parsed = parseNumeric(value);
@@ -361,8 +361,8 @@ export function StockChart({
     const plannedUntilDate = parseLocalCalendarDate(config.planned_monthly_contributions_until);
     if (Number.isNaN(plannedUntilDate.getTime())) return null;
     const firstPoint = data.find((item) =>
-      item.date.getFullYear() === plannedUntilDate.getFullYear()
-      && item.date.getMonth() === plannedUntilDate.getMonth()
+      item.investment_date.getFullYear() === plannedUntilDate.getFullYear()
+      && item.investment_date.getMonth() === plannedUntilDate.getMonth()
       && typeof item.growthOnlyGoalLine === 'number'
       && Number.isFinite(item.growthOnlyGoalLine)
     );

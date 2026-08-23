@@ -50,17 +50,17 @@ describe('financial-utils', () => {
   describe('processStocksData', () => {
     const mockEvents: Event[] = [
       {
-        date: new Date('2024-01-01'),
+        investment_date: new Date('2024-01-01'),
         stocks_in_eur: '1000',
         category: 'Finance',
       },
       {
-        date: new Date('2024-02-01'),
+        investment_date: new Date('2024-02-01'),
         stocks_in_eur: '1100',
         category: 'Finance',
       },
       {
-        date: new Date('2024-03-01'),
+        investment_date: new Date('2024-03-01'),
         stocks_in_eur: '0', // Should be filtered out
         category: 'Finance',
       },
@@ -78,12 +78,12 @@ describe('financial-utils', () => {
     it('should sort data by date', () => {
       const unsortedEvents: Event[] = [
         {
-          date: new Date('2024-02-01'),
+          investment_date: new Date('2024-02-01'),
           stocks_in_eur: '1100',
           category: 'Finance',
         },
         {
-          date: new Date('2024-01-01'),
+          investment_date: new Date('2024-01-01'),
           stocks_in_eur: '1000',
           category: 'Finance',
         },
@@ -91,22 +91,22 @@ describe('financial-utils', () => {
 
       const result = processStocksData(unsortedEvents);
       
-      expect(result[0].date.getTime()).toBeLessThan(result[1].date.getTime());
+      expect(result[0].investment_date.getTime()).toBeLessThan(result[1].investment_date.getTime());
     });
 
     it('should filter out items without stocks data', () => {
       const eventsWithMixedData: Event[] = [
         {
-          date: new Date('2024-01-01'),
+          investment_date: new Date('2024-01-01'),
           stocks_in_eur: '1000',
           category: 'Finance',
         },
         {
-          date: new Date('2024-02-01'),
+          investment_date: new Date('2024-02-01'),
           category: 'Other',
         },
         {
-          date: new Date('2024-03-01'),
+          investment_date: new Date('2024-03-01'),
           stocks_in_eur: '',
           category: 'Finance',
         },
@@ -127,10 +127,10 @@ describe('financial-utils', () => {
   describe('calculateTargetWithFixedContribution - minRequiredContribution', () => {
     it('keeps latest minRequiredContribution constant after last known stocks point (zero growth)', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-01'), stocks_in_eur: '1000' },
-        { date: new Date('2024-02-01') },
-        { date: new Date('2024-03-01') },
-        { date: new Date('2024-04-01') },
+        { investment_date: new Date('2024-01-01'), stocks_in_eur: '1000' },
+        { investment_date: new Date('2024-02-01') },
+        { investment_date: new Date('2024-03-01') },
+        { investment_date: new Date('2024-04-01') },
       ];
       const config = {
         investment_goal: '1300', // Goal close to current for easy math
@@ -152,10 +152,10 @@ describe('financial-utils', () => {
 
     it('computes per-point minRequiredContribution up to latest stocks point, then holds constant (zero growth)', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-01'), stocks_in_eur: '1000' }, // index 0
-        { date: new Date('2024-02-01') },                        // index 1 (no value)
-        { date: new Date('2024-03-01'), stocks_in_eur: '1300' }, // index 2 latest stocks
-        { date: new Date('2024-04-01') },                        // index 3 future
+        { investment_date: new Date('2024-01-01'), stocks_in_eur: '1000' }, // index 0
+        { investment_date: new Date('2024-02-01') },                        // index 1 (no value)
+        { investment_date: new Date('2024-03-01'), stocks_in_eur: '1300' }, // index 2 latest stocks
+        { investment_date: new Date('2024-04-01') },                        // index 3 future
       ];
       const config = {
         investment_goal: '1600',
@@ -181,9 +181,9 @@ describe('financial-utils', () => {
       const lastDate = new Date('2041-04-01'); // 207 months after 2024-01
 
       const events: Event[] = [
-        { date: latestKnownDate, stocks_in_eur: '200000' }, // latest stocks point
-        { date: new Date('2024-02-01') },
-        { date: lastDate }, // final horizon
+        { investment_date: latestKnownDate, stocks_in_eur: '200000' }, // latest stocks point
+        { investment_date: new Date('2024-02-01') },
+        { investment_date: lastDate }, // final horizon
       ];
 
       const config = {
@@ -217,9 +217,9 @@ describe('financial-utils', () => {
 
     it('uses adjusted start + adjusted contribution so projections still reach the goal (zero growth)', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-01'), stocks_in_eur: '100', eunl_rate_to_trend: '2' },
-        { date: new Date('2024-02-01') },
-        { date: new Date('2024-03-01') },
+        { investment_date: new Date('2024-01-01'), stocks_in_eur: '100', eunl_rate_to_trend: '2' },
+        { investment_date: new Date('2024-02-01') },
+        { investment_date: new Date('2024-03-01') },
       ];
       const config = {
         investment_goal: '260',
@@ -240,9 +240,9 @@ describe('financial-utils', () => {
 
     it('projects growth scenario lines from the latest stock point', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-01') },
-        { date: new Date('2024-02-01'), stocks_in_eur: '100' },
-        { date: new Date('2024-03-01') },
+        { investment_date: new Date('2024-01-01') },
+        { investment_date: new Date('2024-02-01'), stocks_in_eur: '100' },
+        { investment_date: new Date('2024-03-01') },
       ];
       const config = {
         investment_goal: '120',
@@ -279,9 +279,9 @@ describe('financial-utils', () => {
 
     it('keeps fetched index-trend growth after the planned-contribution cutoff', () => {
       const events: Event[] = [
-        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
-        { date: parseLocalCalendarDate('2024-02-01') },
-        { date: parseLocalCalendarDate('2024-03-01') },
+        { investment_date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-02-01') },
+        { investment_date: parseLocalCalendarDate('2024-03-01') },
       ];
       const config = {
         investment_goal: '1000',
@@ -307,9 +307,9 @@ describe('financial-utils', () => {
 
     it('does not start minimum contributions before the cutoff when the planned amount is zero', () => {
       const events: Event[] = [
-        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
-        { date: parseLocalCalendarDate('2024-02-01') },
-        { date: parseLocalCalendarDate('2024-03-01') },
+        { investment_date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-02-01') },
+        { investment_date: parseLocalCalendarDate('2024-03-01') },
       ];
       const config = {
         investment_goal: '300',
@@ -330,9 +330,9 @@ describe('financial-utils', () => {
 
     it('projects planned contribution line with fixed monthly contributions (zero growth)', () => {
       const events: Event[] = [
-        { date: new Date('2024-01-01'), stocks_in_eur: '100' },
-        { date: new Date('2024-02-01') },
-        { date: new Date('2024-03-01') },
+        { investment_date: new Date('2024-01-01'), stocks_in_eur: '100' },
+        { investment_date: new Date('2024-02-01') },
+        { investment_date: new Date('2024-03-01') },
       ];
       const config = {
         investment_goal: '1000',
@@ -350,10 +350,10 @@ describe('financial-utils', () => {
 
     it('projects the growth-only goal path from the planned contribution cutoff', () => {
       const events: Event[] = [
-        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
-        { date: parseLocalCalendarDate('2024-02-01') },
-        { date: parseLocalCalendarDate('2024-03-01') },
-        { date: parseLocalCalendarDate('2024-04-01') },
+        { investment_date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-02-01') },
+        { investment_date: parseLocalCalendarDate('2024-03-01') },
+        { investment_date: parseLocalCalendarDate('2024-04-01') },
       ];
       const config = {
         investment_goal: '1000',
@@ -372,10 +372,10 @@ describe('financial-utils', () => {
 
     it('switches every configured-rate projection from near-term to long-term growth at the cutoff', () => {
       const events: Event[] = [
-        { date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
-        { date: parseLocalCalendarDate('2024-02-01') },
-        { date: parseLocalCalendarDate('2024-03-01') },
-        { date: parseLocalCalendarDate('2024-04-01') },
+        { investment_date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-02-01') },
+        { investment_date: parseLocalCalendarDate('2024-03-01') },
+        { investment_date: parseLocalCalendarDate('2024-04-01') },
       ];
       const config = {
         investment_goal: '104',
@@ -405,9 +405,9 @@ describe('financial-utils', () => {
 
     it('keeps near-term growth and planned contributions active for the entire cutoff month', () => {
       const events: Event[] = [
-        { date: parseLocalCalendarDate('2024-01-31'), stocks_in_eur: '100' },
-        { date: parseLocalCalendarDate('2024-02-29') },
-        { date: parseLocalCalendarDate('2024-03-31') },
+        { investment_date: parseLocalCalendarDate('2024-01-31'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-02-29') },
+        { investment_date: parseLocalCalendarDate('2024-03-31') },
       ];
       const config = {
         investment_goal: '111',

@@ -1,6 +1,6 @@
 // Core data types
 export interface Event {
-  date: Date;
+  investment_date: Date;
   event?: string;
   name?: string;
   title?: string;
@@ -10,6 +10,12 @@ export interface Event {
   durationDays?: number;
   stocks_in_eur?: string | number;
   eunl_rate_to_trend?: string | number;
+}
+
+export interface AfterGoalMonthlyCost {
+  category: string;
+  monthlySum: number;
+  skipInflation: boolean;
 }
 
 export interface Condition {
@@ -29,12 +35,14 @@ export interface Config {
   investment_goal?: string;
   annual_growth_rate_near_term?: string;
   annual_growth_rate_long_term?: string;
+  annual_inflation_rate?: string;
+  effective_capital_income_tax_rate?: string;
   planned_monthly_contribution?: string;
   planned_monthly_contributions_until?: string;
 }
 
 export interface ChartDataPoint {
-  date: Date;
+  investment_date: Date;
   dateFormatted: string;
   stocks_in_eur?: number | null;
   stocks_in_eur_adjusted_for_eunl_trend?: number | null;
@@ -88,6 +96,7 @@ export interface StockChartsProps {
   data: Event[];
   config: Config;
   conditions: Condition[];
+  afterGoalMonthlyCosts: AfterGoalMonthlyCost[];
   indexDataBySymbol: Record<string, IndexDataPoint[]>;
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
   onFetchIndexData: (symbol?: string) => Promise<void>;
@@ -114,6 +123,7 @@ export interface IndexHistoryChartProps {
   title: string;
   indexDataBySymbol: Record<string, IndexDataPoint[]>;
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
+  averageIndexTrendStats?: TrendStats | null;
   onFetchIndexData?: (symbol?: string) => Promise<void>;
   loading: boolean;
   stocksData: Event[];
@@ -152,6 +162,7 @@ export interface UseDataReturn {
   data: Event[];
   config: Config;
   conditions: Condition[];
+  afterGoalMonthlyCosts: AfterGoalMonthlyCost[];
   loading: boolean;
   indexLoading: boolean;
   error: string | null;

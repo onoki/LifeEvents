@@ -11,7 +11,7 @@ const localDate = (year: number, month: number, day: number): Date => {
 };
 
 const event = (year: number, month: number, day: number, stocks?: number): Event => ({
-  date: localDate(year, month, day),
+  investment_date: localDate(year, month, day),
   stocks_in_eur: stocks,
 });
 
@@ -35,7 +35,7 @@ describe('shared chart date ranges', () => {
 
     expect(range.min).toEqual(localDate(2023, 2, 1));
     expect(range.max).toEqual(localDate(2025, 4, 20));
-    expect(filterDataByViewMode(data, 'recorded', config, now).map((item) => item.date)).toEqual([
+    expect(filterDataByViewMode(data, 'recorded', config, now).map((item) => item.investment_date)).toEqual([
       localDate(2025, 4, 20),
       localDate(2023, 2, 1),
       localDate(2023, 3, 15),
@@ -50,9 +50,9 @@ describe('shared chart date ranges', () => {
     expect(range.max).not.toEqual(localDate(2027, 4, 20));
 
     const filtered = filterDataByViewMode(data, 'next2years', config, now);
-    expect(filtered.some((item) => item.date.getTime() === localDate(2028, 8, 16).getTime())).toBe(true);
-    expect(filtered.some((item) => item.date.getTime() === localDate(2028, 8, 17).getTime())).toBe(false);
-    expect(filtered.some((item) => item.date.getTime() === localDate(2022, 12, 1).getTime())).toBe(false);
+    expect(filtered.some((item) => item.investment_date.getTime() === localDate(2028, 8, 16).getTime())).toBe(true);
+    expect(filtered.some((item) => item.investment_date.getTime() === localDate(2028, 8, 17).getTime())).toBe(false);
+    expect(filtered.some((item) => item.investment_date.getTime() === localDate(2022, 12, 1).getTime())).toBe(false);
   });
 
   it('ends the planned view one calendar year after the configured date', () => {

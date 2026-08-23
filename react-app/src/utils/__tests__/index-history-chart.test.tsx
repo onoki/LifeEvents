@@ -25,21 +25,35 @@ const eunlPoints = [
   makePoint('2024-01-01', -2),
 ];
 
-const renderChart = (viewMode: ViewMode = 'full') => render(
+const renderChart = (
+  viewMode: ViewMode = 'full',
+  averageAnnualGrowthRate = 0.08
+) => render(
   <IndexHistoryChart
     title="Index history"
     indexDataBySymbol={{ 'EUNL.DE': eunlPoints }}
     indexTrendStatsBySymbol={{
       'EUNL.DE': { annualGrowthRate: 0.08, standardDeviation: SIGMA },
     }}
+    averageIndexTrendStats={{ annualGrowthRate: averageAnnualGrowthRate, standardDeviation: SIGMA }}
     loading={false}
-    stocksData={[{ date: new Date('2022-01-15T00:00:00.000Z'), stocks_in_eur: 100 }]}
+    stocksData={[{ investment_date: new Date('2022-01-15T00:00:00.000Z'), stocks_in_eur: 100 }]}
     config={{}}
     viewMode={viewMode}
   />
 );
 
 describe('IndexHistoryChart series labels', () => {
+  it.each([
+    [0.08, '8.0 %'],
+    [0.0876, '8.8 %'],
+  ])('shows the shared all-index average %p as %s', (averageRate, expectedLabel) => {
+    renderChart('full', averageRate);
+
+    expect(screen.getByTestId('average-index-trend'))
+      .toHaveTextContent(`Average of all indexes: ${expectedLabel}`);
+  });
+
   it('uses the same short index name in the expanded legend as in the tooltip', () => {
     render(
       <IndexHistoryChart
@@ -84,6 +98,10 @@ describe('IndexHistoryChart sigma status', () => {
   it('masks dates that would reveal a user-derived index viewport in privacy mode', () => {
     window.history.replaceState({}, '', '/?privacy=true');
     const { container } = renderChart('next2years');
+
+    // The aggregate is calculated only from public index history, so it remains visible.
+    expect(screen.getByTestId('average-index-trend'))
+      .toHaveTextContent('Average of all indexes: 8.0 %');
 
     const regimeTitles = Array.from(container.querySelectorAll('[data-zone] title'));
     expect(regimeTitles.length).toBeGreaterThan(0);

@@ -1,4 +1,13 @@
-import type { Event, Condition, Config, ViewMode, ChartDataPoint, MilestoneMarker, MiniReward } from '../types';
+import type {
+  AfterGoalMonthlyCost,
+  Event,
+  Condition,
+  Config,
+  ViewMode,
+  ChartDataPoint,
+  MilestoneMarker,
+  MiniReward,
+} from '../types';
 import { APP_CONFIG } from '../config/app-config';
 import { parseNumeric } from './number-utils';
 import { parseLocalCalendarDate } from './date-utils';
@@ -74,7 +83,7 @@ export function getChartDateRange(
 
   const stockDates = data
     .filter((item) => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0)
-    .map((item) => item.date)
+    .map((item) => item.investment_date)
     .filter((date) => date instanceof Date && !Number.isNaN(date.getTime()));
 
   if (stockDates.length === 0) {
@@ -108,8 +117,8 @@ export function processEventData(event: Record<string, string>): Event {
     ...event,
   } as unknown as Event;
 
-  if (event.date) {
-    normalized.date = parseLocalCalendarDate(event.date);
+  if (event.investment_date) {
+    normalized.investment_date = parseLocalCalendarDate(event.investment_date);
   }
 
   if (event.stocks_in_eur) {
@@ -138,126 +147,190 @@ export function processEventData(event: Record<string, string>): Event {
   return normalized;
 }
 
+export interface ParsedTSVData {
+  config: Config;
+  conditions: Condition[];
+  data: Event[];
+  miniRewards: MiniReward[];
+  afterGoalMonthlyCosts: AfterGoalMonthlyCost[];
+}
+
+type SheetSection = 'conditions' | 'investments' | 'miniRewards' | 'afterGoalMonthlyCosts';
+
+interface SheetRow {
+  cells: string[];
+  isBlank: boolean;
+}
+
+const CONDITIONS_HEADERS = ['condition', 'explanation_short', 'explanation_long'] as const;
+const MINI_REWARDS_HEADERS = ['mini_reward_percentage', 'mini_reward_taken'] as const;
+const AFTER_GOAL_MONTHLY_COST_HEADERS = [
+  'after_goal_monthly_category',
+  'after_goal_monthly_sum',
+  'after_goal_monthly_skip_inflation',
+] as const;
+const CONFIG_KEYS = new Set([
+  'investment_goal',
+  'annual_growth_rate_near_term',
+  'annual_growth_rate_long_term',
+  'annual_inflation_rate',
+  'effective_capital_income_tax_rate',
+  'planned_monthly_contribution',
+  'planned_monthly_contributions_until',
+]);
+
+const hasExactHeaders = (cells: string[], headers: readonly string[]): boolean => (
+  headers.every((header, index) => cells[index] === header)
+  && cells.slice(headers.length).every((cell) => cell === '')
+);
+
+const getSection = (cells: string[]): SheetSection | null => {
+  if (hasExactHeaders(cells, CONDITIONS_HEADERS)) return 'conditions';
+  if (hasExactHeaders(cells, MINI_REWARDS_HEADERS)) return 'miniRewards';
+  if (hasExactHeaders(cells, AFTER_GOAL_MONTHLY_COST_HEADERS)) return 'afterGoalMonthlyCosts';
+  if (cells.includes('investment_date') && cells.includes('stocks_in_eur')) return 'investments';
+  return null;
+};
+
+const isConfigRow = (cells: string[]): boolean => (
+  CONFIG_KEYS.has(cells[0] ?? '')
+  && Boolean(cells[1])
+  && cells.slice(2).every((cell) => cell === '')
+);
+
+const parseMonthlySum = (rawValue: string): number | null => {
+  const normalized = rawValue.trim().replace(/\s/g, '').replace(',', '.');
+  if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(normalized)) return null;
+
+  const value = Number(normalized);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+};
+
 /**
  * Parse TSV data from Google Sheets
  */
-export function parseTSVData(tsvText: string): { config: Config; conditions: Condition[]; data: Event[]; miniRewards: MiniReward[] } {
-  const lines = tsvText.trim().split('\n');
-  
-  // Parse configuration parameters (first few lines)
+export function parseTSVData(tsvText: string): ParsedTSVData {
+  const rows: SheetRow[] = tsvText.replace(/^\uFEFF/, '').split(/\r?\n/).map((line) => {
+    const cells = line.split('\t').map((cell) => cell.trim());
+    return { cells, isBlank: cells.every((cell) => cell === '') };
+  });
+  const sectionByHeaderIndex = new Map<number, SheetSection>();
+  rows.forEach((row, index) => {
+    const section = getSection(row.cells);
+    if (section) sectionByHeaderIndex.set(index, section);
+  });
+
+  const legacyDateHeader = rows.some((row) => (
+    row.cells.includes('date') && row.cells.includes('stocks_in_eur')
+  ));
+  if (legacyDateHeader) {
+    throw new Error(
+      'Investment data must use the "investment_date" header; the legacy "date" header is not supported.'
+    );
+  }
+
+  const investmentHeaderEntry = [...sectionByHeaderIndex.entries()]
+    .find(([, section]) => section === 'investments');
+  if (!investmentHeaderEntry) {
+    throw new Error('Missing required investment data header "investment_date".');
+  }
+
+  const sectionRows = new Map<number, number[]>();
+  const consumedRowIndexes = new Set<number>();
+  sectionByHeaderIndex.forEach((_section, headerIndex) => {
+    consumedRowIndexes.add(headerIndex);
+    const dataRowIndexes: number[] = [];
+    for (let index = headerIndex + 1; index < rows.length; index++) {
+      if (
+        rows[index].isBlank
+        || sectionByHeaderIndex.has(index)
+        || isConfigRow(rows[index].cells)
+      ) break;
+      dataRowIndexes.push(index);
+      consumedRowIndexes.add(index);
+    }
+    sectionRows.set(headerIndex, dataRowIndexes);
+  });
+
   const configData: Config = {};
-  let conditionsStartIndex = 0;
-  let dataStartIndex = 0;
-  let miniRewardsStartIndex = -1;
-  
-  // Look for config lines first
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    if (line.includes('\t')) {
-      const parts = line.split('\t');
-      
-      // Check if this looks like a config line (key-value pair)
-      if (parts.length >= 2 && !line.match(/^\d{4}-\d{2}-\d{2}/) && !line.includes('condition')) {
-        const key = parts[0].trim();
-        const value = parts[1].trim();
-        configData[key] = value;
-        
-        // Don't set conditionsStartIndex here, let it be found naturally
-      } else if (line.includes('condition') && line.includes('explanation_short') && line.includes('explanation_long')) {
-        // Found conditions header
-        conditionsStartIndex = i;
-      } else if (line.match(/^\d{4}-\d{2}-\d{2}/)) {
-        // Found first date line, this is where data starts
-        dataStartIndex = i;
-        break;
-      }
-    }
-  }
-  
-  // Parse conditions section
+  rows.forEach((row, index) => {
+    if (row.isBlank || consumedRowIndexes.has(index)) return;
+    const [key = '', value = ''] = row.cells;
+    if (key && row.cells.length >= 2) configData[key] = value;
+  });
+
   const conditionsData: Condition[] = [];
-  
-  if (conditionsStartIndex > 0 && dataStartIndex > conditionsStartIndex) {
-    const conditionsLines = lines.slice(conditionsStartIndex, dataStartIndex - 1);
-    
-    const conditionsHeaders = conditionsLines[0].split('\t').map(h => h.trim());
-    
-    for (let i = 1; i < conditionsLines.length; i++) {
-      const line = conditionsLines[i].trim();
-      if (line) {
-        const values = line.split('\t').map(v => v.trim());
-        const condition: Condition = {};
-        
-        conditionsHeaders.forEach((header, headerIndex) => {
-          (condition as any)[header] = values[headerIndex] || '';
-        });
-        
-        conditionsData.push(condition);
-      }
-    }
-  }
-  
-  // Find mini reward header if it exists (after data rows)
-  for (let i = dataStartIndex; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const [firstCell] = line.split('\t');
-    if (firstCell && firstCell.trim() === 'mini_reward_percentage') {
-      miniRewardsStartIndex = i;
-      break;
-    }
-  }
-
-  // Parse the actual data starting from the date header
-  const dataLines = lines.slice(
-    dataStartIndex - 1,
-    miniRewardsStartIndex > 0 ? miniRewardsStartIndex : lines.length
-  );
-  
-  if (dataLines.length === 0) {
-    return { config: configData, conditions: conditionsData, data: [], miniRewards: [] };
-  }
-  
-  const headers = dataLines[0].split('\t').map(h => h.trim());
-  
-  const parsedData = dataLines.slice(1).map((line) => {
-    const values = line.split('\t').map(v => v.trim());
-    const event: Record<string, string> = {};
-    
-    headers.forEach((header, headerIndex) => {
-      event[header] = values[headerIndex] || '';
-    });
-
-    return processEventData(event);
-  }).filter(event => event.date);
-  
+  const parsedData: Event[] = [];
   const miniRewards: MiniReward[] = [];
-  if (miniRewardsStartIndex > -1) {
-    const rewardLines = lines.slice(miniRewardsStartIndex);
-    const rewardHeaders = rewardLines[0].split('\t').map(h => h.trim());
-    const percentageIndex = rewardHeaders.indexOf('mini_reward_percentage');
-    const takenIndex = rewardHeaders.indexOf('mini_reward_taken');
+  const afterGoalMonthlyCosts: AfterGoalMonthlyCost[] = [];
 
-    for (let i = 1; i < rewardLines.length; i++) {
-      const line = rewardLines[i].trim();
-      if (!line) continue;
-      const values = line.split('\t').map(v => v.trim());
-      const percentageRaw = values[percentageIndex] || '';
-      const percentage = parseNumeric(percentageRaw);
-      if (!Number.isFinite(percentage)) {
-        continue;
-      }
-      const takenRaw = values[takenIndex] || '';
-      miniRewards.push({
-        percentage,
-        taken: Boolean(takenRaw),
-        takenRaw
+  sectionByHeaderIndex.forEach((section, headerIndex) => {
+    const headerCells = rows[headerIndex].cells;
+    const bodyRows = (sectionRows.get(headerIndex) ?? []).map((index) => rows[index].cells);
+
+    if (section === 'conditions') {
+      bodyRows.forEach((cells) => {
+        const condition: Condition = {};
+        CONDITIONS_HEADERS.forEach((header, index) => {
+          condition[header] = cells[index] || '';
+        });
+        if (Object.values(condition).some(Boolean)) conditionsData.push(condition);
       });
+      return;
     }
-  }
 
-  return { config: configData, conditions: conditionsData, data: parsedData, miniRewards };
+    if (section === 'investments') {
+      bodyRows.forEach((cells) => {
+        const event: Record<string, string> = {};
+        headerCells.forEach((header, index) => {
+          event[header] = cells[index] || '';
+        });
+        const normalizedEvent = processEventData(event);
+        if (
+          normalizedEvent.investment_date instanceof Date
+          && !Number.isNaN(normalizedEvent.investment_date.getTime())
+        ) {
+          parsedData.push(normalizedEvent);
+        }
+      });
+      return;
+    }
+
+    if (section === 'miniRewards') {
+      bodyRows.forEach((cells) => {
+        const percentageRaw = cells[0] || '';
+        const percentage = parseNumeric(percentageRaw);
+        if (!Number.isFinite(percentage)) return;
+        const takenRaw = cells[1] || '';
+        miniRewards.push({
+          percentage,
+          taken: Boolean(takenRaw),
+          takenRaw,
+        });
+      });
+      return;
+    }
+
+    bodyRows.forEach((cells) => {
+      const category = cells[0]?.trim() ?? '';
+      const monthlySum = parseMonthlySum(cells[1] ?? '');
+      const skipInflationRaw = cells[2]?.trim().toLowerCase() ?? '';
+      if (!category || monthlySum === null || !['', 'x'].includes(skipInflationRaw)) return;
+      afterGoalMonthlyCosts.push({
+        category,
+        monthlySum,
+        skipInflation: skipInflationRaw === 'x',
+      });
+    });
+  });
+
+  return {
+    config: configData,
+    conditions: conditionsData,
+    data: parsedData,
+    miniRewards,
+    afterGoalMonthlyCosts,
+  };
 }
 
 /**
@@ -267,8 +340,8 @@ export function getMonthlyEventData(data: Event[]): Array<{ month: string; event
   const monthlyCount: Record<string, number> = {};
   
   data.forEach(event => {
-    if (event.date) {
-      const monthKey = `${event.date.getFullYear()}-${String(event.date.getMonth() + 1).padStart(2, '0')}`;
+    if (event.investment_date) {
+      const monthKey = `${event.investment_date.getFullYear()}-${String(event.investment_date.getMonth() + 1).padStart(2, '0')}`;
       monthlyCount[monthKey] = (monthlyCount[monthKey] || 0) + 1;
     }
   });
@@ -305,7 +378,7 @@ export function getCategoryData(data: Event[]): Array<{ name: string; value: num
  */
 export function getRecentEvents(data: Event[], limit: number = APP_CONFIG.UI.MAX_RECENT_EVENTS): Event[] {
   return data
-    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .sort((a, b) => b.investment_date.getTime() - a.investment_date.getTime())
     .slice(0, limit);
 }
 
@@ -327,7 +400,7 @@ export function filterDataByViewMode(
   }
 
   return data.filter((item) => {
-    const itemDate = item.date;
+    const itemDate = item.investment_date;
     if (!(itemDate instanceof Date) || Number.isNaN(itemDate.getTime())) return false;
     if (range.min && itemDate < range.min) return false;
     if (range.max && itemDate > range.max) return false;

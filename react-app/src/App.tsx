@@ -20,6 +20,7 @@ function App(): React.JSX.Element {
     config, 
     conditions, 
     miniRewards,
+    afterGoalMonthlyCosts,
     loading, 
     error, 
     loadData, 
@@ -108,6 +109,7 @@ function App(): React.JSX.Element {
               data={data} 
               config={config} 
               conditions={conditions}
+              afterGoalMonthlyCosts={afterGoalMonthlyCosts}
               indexDataBySymbol={indexDataBySymbol}
               indexTrendStatsBySymbol={indexTrendStatsBySymbol}
               onFetchIndexData={handleFetchIndexData}
@@ -143,7 +145,7 @@ function App(): React.JSX.Element {
                   <div className="space-y-3">
                     <div>
                       <p className="font-medium">📋 Configuration Section:</p>
-                      <p className="font-mono text-xs ml-2">investment_goal, annual_growth_rate_near_term, annual_growth_rate_long_term</p>
+                      <p className="font-mono text-xs ml-2">investment_goal, annual_growth_rate_near_term, annual_growth_rate_long_term, annual_inflation_rate, effective_capital_income_tax_rate</p>
                     </div>
                     
                     <div>
@@ -153,8 +155,13 @@ function App(): React.JSX.Element {
                     
                     <div>
                       <p className="font-medium">📈 Stock Information Section:</p>
-                      <p className="font-mono text-xs ml-2">date, stocks_in_eur</p>
+                      <p className="font-mono text-xs ml-2">investment_date, stocks_in_eur</p>
                       <p className="text-xs ml-2 text-muted-foreground">Optional: event, category, status, duration</p>
+                    </div>
+
+                    <div>
+                      <p className="font-medium">Monthly Costs After Goal:</p>
+                      <p className="font-mono text-xs ml-2">after_goal_monthly_category, after_goal_monthly_sum, after_goal_monthly_skip_inflation</p>
                     </div>
                   </div>
                 </div>

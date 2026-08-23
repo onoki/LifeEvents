@@ -26,7 +26,7 @@ jest.mock('../../hooks/use-kpi-calculations', () => ({
 
 jest.mock('../financial-utils', () => ({
   calculateTargetWithFixedContribution: (): ChartDataPoint[] => [{
-    date: new Date(2027, 0, 1),
+    investment_date: new Date(2027, 0, 1),
     dateFormatted: 'Jan 27',
     minRequiredContributionAdjustedForEUNLTrend: 1000,
   }],
@@ -77,7 +77,7 @@ describe('KPI privacy labels', () => {
         <FocusedSavingsCard config={{ planned_monthly_contributions_until: '2028-12-31' }} />
         <RetirementCard />
         <MiniRewardsCard
-          data={[{ date: new Date(2043, 0, 1), stocks_in_eur: 500000 }]}
+          data={[{ investment_date: new Date(2043, 0, 1), stocks_in_eur: 500000 }]}
           config={{ investment_goal: '500000' }}
           miniRewards={[{ percentage: 50, taken: false }]}
         />

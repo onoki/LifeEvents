@@ -248,6 +248,7 @@ export function IndexHistoryChart({
   title,
   indexDataBySymbol,
   indexTrendStatsBySymbol,
+  averageIndexTrendStats,
   onFetchIndexData,
   loading,
   stocksData,
@@ -495,6 +496,10 @@ export function IndexHistoryChart({
   const yahooSeries = APP_CONFIG.API.INDEX_SERIES.filter((series) => series.source === 'yahoo');
   const morningstarSeries = APP_CONFIG.API.INDEX_SERIES.filter((series) => series.source === 'morningstar');
   const visibleLatestMetrics = latestMetrics.filter(({ config }) => visibleSymbols[config.symbol]);
+  const averageAnnualGrowthRate = averageIndexTrendStats
+    && Number.isFinite(averageIndexTrendStats.annualGrowthRate)
+    ? averageIndexTrendStats.annualGrowthRate
+    : null;
 
   const renderSourceLinksToggle = (): React.JSX.Element => {
     return (
@@ -860,6 +865,18 @@ export function IndexHistoryChart({
 
       <ChartLegend items={legendItems} controls={renderSourceLinksToggle()} />
       {renderSourceLinksPanel()}
+
+      {averageAnnualGrowthRate !== null && (
+        <div
+          className="mt-4 rounded border border-border/50 px-3 py-2 text-sm text-muted-foreground"
+          data-testid="average-index-trend"
+        >
+          Average of all indexes:{' '}
+          <span className="font-semibold text-foreground">
+            {(averageAnnualGrowthRate * 100).toFixed(1)} %
+          </span>
+        </div>
+      )}
 
       {latestMetrics.length > 0 && (
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-2 text-sm text-muted-foreground">

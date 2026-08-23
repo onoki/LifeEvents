@@ -18,7 +18,7 @@ const privateConfig: Config = {
 
 const chartData: ChartDataPoint[] = [
   {
-    date: new Date('2042-01-01'),
+    investment_date: new Date('2042-01-01'),
     dateFormatted: 'Jan 42',
     stocks_in_eur: 100000,
     stocks_in_eur_adjusted_for_eunl_trend: 110000,
@@ -35,7 +35,7 @@ const chartData: ChartDataPoint[] = [
     minRequiredContributionAdjustedForEUNLTrend: 2000,
   },
   {
-    date: new Date('2042-06-01'),
+    investment_date: new Date('2042-06-01'),
     dateFormatted: 'Jun 42',
     targetWithFixedContribution: 150000,
     targetWithMinimumContribution: 160000,
@@ -50,7 +50,7 @@ const chartData: ChartDataPoint[] = [
     minRequiredContributionAdjustedForEUNLTrend: 2000,
   },
   {
-    date: new Date('2042-12-01'),
+    investment_date: new Date('2042-12-01'),
     dateFormatted: 'Dec 42',
     targetWithFixedContribution: 200000,
     targetWithMinimumContribution: 210000,

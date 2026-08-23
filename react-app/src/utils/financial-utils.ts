@@ -165,9 +165,9 @@ export function calculateTargetWithFixedContribution(
     && (!hasValidPlannedUntil || isDateInOrBeforeMonth(date, plannedUntilDate!));
   
   // Prepare data
-  const sortedData = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
-  const firstDate = sortedData[0].date;
-  const lastDate = sortedData[sortedData.length - 1].date;
+  const sortedData = [...data].sort((a, b) => a.investment_date.getTime() - b.investment_date.getTime());
+  const firstDate = sortedData[0].investment_date;
+  const lastDate = sortedData[sortedData.length - 1].investment_date;
   
   // Find first stocks data point
   const firstStocksData = sortedData.find(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0);
@@ -193,7 +193,9 @@ export function calculateTargetWithFixedContribution(
     .filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0)
     .pop();
   const latestDataPointIndex = latestDataPoint 
-    ? sortedData.findIndex(item => item.date.getTime() === latestDataPoint.date.getTime())
+    ? sortedData.findIndex(item => (
+        item.investment_date.getTime() === latestDataPoint.investment_date.getTime()
+      ))
     : -1;
   const useAdjustedMinContribution = Boolean(
     latestDataPoint?.stocks_in_eur && latestDataPoint?.eunl_rate_to_trend
@@ -229,12 +231,12 @@ export function calculateTargetWithFixedContribution(
     const currentValue = rawStocksValue ?? 0;
     const adjustedValue = getAdjustedValue(rawStocksValue, item.eunl_rate_to_trend);
     const projectionStartValue = adjustedValue ?? currentValue;
-    const contributesThisMonth = shouldApplyPlannedContribution(item.date);
+    const contributesThisMonth = shouldApplyPlannedContribution(item.investment_date);
     const isLatestDataPoint = index === latestDataPointIndex;
     const isFuturePoint = index > latestDataPointIndex;
-    const monthlyGrowthRate = getAnnualGrowthRateForDate(config, item.date) / 12;
-    const monthlyRateMinusOne = (getAnnualGrowthRateForDate(config, item.date) - 0.01) / 12;
-    const monthlyRatePlusOne = (getAnnualGrowthRateForDate(config, item.date) + 0.01) / 12;
+    const monthlyGrowthRate = getAnnualGrowthRateForDate(config, item.investment_date) / 12;
+    const monthlyRateMinusOne = (getAnnualGrowthRateForDate(config, item.investment_date) - 0.01) / 12;
+    const monthlyRatePlusOne = (getAnnualGrowthRateForDate(config, item.investment_date) + 0.01) / 12;
     // The index-trend scenarios represent the fetched historical index trend,
     // so they keep that rate for their entire projection. The cutoff controls
     // planned contributions, but must not replace the fetched rate with a
@@ -244,9 +246,9 @@ export function calculateTargetWithFixedContribution(
     // Capital required at/after the planned-contribution cutoff for growth alone
     // to reach the investment goal at the end of the shared chart horizon.
     const isAtOrAfterPlannedUntil = hasValidPlannedUntil
-      && monthsBetween(plannedUntilDate!, item.date) >= 0;
+      && monthsBetween(plannedUntilDate!, item.investment_date) >= 0;
     const futureGrowthFactor = calculateGrowthAndContributionFactors(
-      getMonthlyRatesBetween(item.date, lastDate, config)
+      getMonthlyRatesBetween(item.investment_date, lastDate, config)
     ).growthFactor;
     const growthOnlyGoalLine = isAtOrAfterPlannedUntil
       ? investmentGoal / futureGrowthFactor
@@ -255,7 +257,11 @@ export function calculateTargetWithFixedContribution(
     // Calculate target value with fixed contribution
     let targetValue = projectionState.fixedContributionLine;
     if (index > 0) {
-      getMonthlyRatesBetween(sortedData[index - 1].date, item.date, config).forEach((rate) => {
+      getMonthlyRatesBetween(
+        sortedData[index - 1].investment_date,
+        item.investment_date,
+        config
+      ).forEach((rate) => {
         targetValue = targetValue * (1 + rate) + baselineMonthlyContribution;
       });
       projectionState.fixedContributionLine = targetValue;
@@ -270,7 +276,7 @@ export function calculateTargetWithFixedContribution(
       minRequiredContribution = calculateMinRequiredContribution(
         currentValue,
         investmentGoal,
-        item.date,
+        item.investment_date,
         lastDate
       );
       projectionState.latestMinRequired = minRequiredContribution;
@@ -279,7 +285,7 @@ export function calculateTargetWithFixedContribution(
         minRequiredContributionAdjusted = calculateMinRequiredContribution(
           adjustedValue,
           investmentGoal,
-          item.date,
+          item.investment_date,
           lastDate
         );
         projectionState.latestMinRequiredAdjusted = minRequiredContributionAdjusted;
@@ -328,7 +334,7 @@ export function calculateTargetWithFixedContribution(
       if (hasTrendGrowth) {
         lineWithTrendGrowth = projectionState.trendGrowthLine * (1 + monthlyTrendRate) + effectiveMinContribution;
         const isAfterPlannedCutoff = hasValidPlannedUntil
-          && isDateAfterMonth(item.date, plannedUntilDate!);
+          && isDateAfterMonth(item.investment_date, plannedUntilDate!);
         const plannedContributionBeforeCutoff = plannedMonthlyContribution > 0
           ? plannedMonthlyContribution
           : 0;
@@ -374,7 +380,7 @@ export function calculateTargetWithFixedContribution(
         : calculateMinRequiredContribution(
             baseValue,
             investmentGoal,
-            item.date,
+            item.investment_date,
             lastDate
           );
       
@@ -390,13 +396,13 @@ export function calculateTargetWithFixedContribution(
       projectionState.plannedProjectionValue = projectionState.plannedProjectionValue * (1 + monthlyGrowthRate)
         + (contributesThisMonth ? plannedMonthlyContribution : 0);
       
-      if (hasValidPlannedUntil && isDateAfterMonth(item.date, plannedUntilDate!)) {
+      if (hasValidPlannedUntil && isDateAfterMonth(item.investment_date, plannedUntilDate!)) {
         plannedMinRequiredContribution = projectionState.plannedMinRequired;
       } else {
         plannedMinRequiredContribution = calculateMinRequiredContribution(
           projectionState.plannedProjectionValue,
           investmentGoal,
-          item.date,
+          item.investment_date,
           lastDate
         );
         projectionState.plannedMinRequired = plannedMinRequiredContribution;
@@ -411,7 +417,7 @@ export function calculateTargetWithFixedContribution(
         expectedMinRequiredContribution = calculateMinRequiredContribution(
           projectionState.expectedProjectionValue,
           investmentGoal,
-          item.date,
+          item.investment_date,
           lastDate
         );
         projectionState.expectedMinRequired = expectedMinRequiredContribution;
@@ -419,13 +425,13 @@ export function calculateTargetWithFixedContribution(
         projectionState.expectedProjectionValue = projectionState.expectedProjectionValue * (1 + monthlyGrowthRate)
           + (contributesThisMonth ? plannedMonthlyContribution : 0);
 
-        if (hasValidPlannedUntil && isDateAfterMonth(item.date, plannedUntilDate!)) {
+        if (hasValidPlannedUntil && isDateAfterMonth(item.investment_date, plannedUntilDate!)) {
           expectedMinRequiredContribution = projectionState.expectedMinRequired;
         } else {
           expectedMinRequiredContribution = calculateMinRequiredContribution(
             projectionState.expectedProjectionValue,
             investmentGoal,
-            item.date,
+            item.investment_date,
             lastDate
           );
           projectionState.expectedMinRequired = expectedMinRequiredContribution;
@@ -438,7 +444,7 @@ export function calculateTargetWithFixedContribution(
     
     const resultItem: ChartDataPoint = {
       ...item,
-      dateFormatted: item.date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
+      dateFormatted: item.investment_date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
       // Projection series; chart tooltips sort the visible values at render time.
       lineWithPlusOnePercentGrowth: lineWithPlusOnePercentGrowth ? Math.max(0, lineWithPlusOnePercentGrowth) : null,
       lineWithTrendGrowth: lineWithTrendGrowth ? Math.max(0, lineWithTrendGrowth) : null,
@@ -471,13 +477,13 @@ export function calculateTargetWithFixedContribution(
  */
 export function processStocksData(data: Event[]): ChartDataPoint[] {
   return data
-    .filter(item => item.date && item.stocks_in_eur)
+    .filter(item => item.investment_date && item.stocks_in_eur)
     .map(item => ({
       ...item,
-      dateFormatted: item.date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
+      dateFormatted: item.investment_date.toLocaleDateString('en-US', APP_CONFIG.DATA.DATE_FORMAT_OPTIONS),
       stocks_in_eur: parseNumeric(item.stocks_in_eur!) || 0
     }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+    .sort((a, b) => a.investment_date.getTime() - b.investment_date.getTime());
 }
 
 /**
@@ -614,7 +620,7 @@ export function calculateCurrentStockEstimate(
   data: Event[], 
   config: Config, 
   currentTime: Date = new Date(),
-  chartData?: any[] // Optional chart data with pre-calculated minRequiredContribution
+  chartData?: ChartDataPoint[] // Optional chart data with pre-calculated minRequiredContribution
 ): {
   currentEstimate: number;
   uncorrectedEstimate: number;
@@ -629,14 +635,14 @@ export function calculateCurrentStockEstimate(
   // Get the last recorded stock value
   const sortedData = [...data]
     .filter(item => item.stocks_in_eur && parseNumeric(item.stocks_in_eur) > 0)
-    .sort((a, b) => b.date.getTime() - a.date.getTime());
+    .sort((a, b) => b.investment_date.getTime() - a.investment_date.getTime());
 
   if (sortedData.length === 0) {
     return { currentEstimate: 0, uncorrectedEstimate: 0, changePerDay: 0, growthPerDay: 0, contributionPerDay: 0 };
   }
 
   const lastRecord = sortedData[0];
-  const lastDate = lastRecord.date;
+  const lastDate = lastRecord.investment_date;
   
   const baseStocksValue = parseNumeric(lastRecord.stocks_in_eur!);
   // Use adjusted value (stocks_in_eur * eunl_rate_to_trend) if available, otherwise use stocks_in_eur
@@ -667,7 +673,7 @@ export function calculateCurrentStockEstimate(
     // Find the latest data point with minimum contribution
     const latestChartData = chartData
       .filter(item => item.minRequiredContribution !== undefined && item.minRequiredContribution !== null)
-      .sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+      .sort((a, b) => b.investment_date.getTime() - a.investment_date.getTime())[0];
     
     if (latestChartData) {
       minimumContribution = latestChartData.minRequiredContribution;

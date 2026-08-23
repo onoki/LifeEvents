@@ -4,8 +4,19 @@ import { StockChart } from './StockChart';
 import { MinRequiredContributionsChart } from './MinRequiredContributionsChart';
 import { IndexHistoryChart } from './IndexHistoryChart';
 import { ConditionsTable } from './ConditionsTable';
+import { RetirementCoverageChart } from './RetirementCoverageChart';
 import { useFinancialCalculations } from '../../hooks/use-financial-calculations';
+import { useKPICalculations } from '../../hooks/use-kpi-calculations';
+import { APP_CONFIG } from '../../config/app-config';
+import { calculateCurrentStockEstimate } from '../../utils/financial-utils';
+import { calculateRetirementCoverage } from '../../utils/retirement-coverage-utils';
+import { parseNumeric } from '../../utils/number-utils';
 import type { StockChartsProps } from '../../types';
+
+const parseConfigNumber = (value: string | undefined, fallback: number): number => {
+  const parsed = parseNumeric(value ?? '');
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 /**
  * Stock Charts Container Component
@@ -15,6 +26,7 @@ export function StockCharts({
   data, 
   config, 
   conditions, 
+  afterGoalMonthlyCosts,
   indexDataBySymbol,
   indexTrendStatsBySymbol,
   onFetchIndexData,
@@ -47,6 +59,53 @@ export function StockCharts({
     viewMode,
     averageIndexTrendStats?.annualGrowthRate
   );
+  const { currentTime } = useKPICalculations();
+
+  const retirementCoverage = React.useMemo(() => {
+    const goalDate = data.reduce<Date | null>((latest, item) => {
+      const candidate = item.investment_date;
+      if (!(candidate instanceof Date) || Number.isNaN(candidate.getTime())) return latest;
+      return latest === null || candidate > latest ? candidate : latest;
+    }, null);
+    if (goalDate === null) return null;
+
+    const todayEstimate = calculateCurrentStockEstimate(
+      data,
+      config,
+      currentTime,
+      fullChartData
+    ).currentEstimate;
+    const annualGrowthRateLongTerm = parseConfigNumber(
+      config.annual_growth_rate_long_term,
+      APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_LONG_TERM
+    );
+    const annualInflationRate = parseConfigNumber(
+      config.annual_inflation_rate,
+      APP_CONFIG.DEFAULTS.ANNUAL_INFLATION_RATE
+    );
+    const effectiveCapitalIncomeTaxRate = parseConfigNumber(
+      config.effective_capital_income_tax_rate,
+      APP_CONFIG.DEFAULTS.EFFECTIVE_CAPITAL_INCOME_TAX_RATE
+    );
+    const investmentGoal = parseConfigNumber(
+      config.investment_goal,
+      APP_CONFIG.DEFAULTS.INVESTMENT_GOAL
+    );
+
+    return {
+      goalDate,
+      result: calculateRetirementCoverage({
+        asOfDate: currentTime,
+        goalDate,
+        todayEstimate,
+        investmentGoal,
+        annualGrowthRateLongTerm,
+        annualInflationRate,
+        effectiveCapitalIncomeTaxRate,
+        costs: afterGoalMonthlyCosts,
+      }),
+    };
+  }, [afterGoalMonthlyCosts, config, currentTime, data, fullChartData]);
 
   const handleFetchIndexData = async (symbol?: string): Promise<void> => {
     if (onFetchIndexData) {
@@ -54,8 +113,10 @@ export function StockCharts({
     }
   };
 
-  const filteredTimestamps = new Set(filteredData.map((item) => item.date.getTime()));
-  const filteredChartData = fullChartData.filter((item) => filteredTimestamps.has(item.date.getTime()));
+  const filteredTimestamps = new Set(filteredData.map((item) => item.investment_date.getTime()));
+  const filteredChartData = fullChartData.filter((item) => (
+    filteredTimestamps.has(item.investment_date.getTime())
+  ));
 
   return (
     <div className="space-y-6">
@@ -92,6 +153,7 @@ export function StockCharts({
           title="Index history"
           indexDataBySymbol={indexDataBySymbol}
           indexTrendStatsBySymbol={indexTrendStatsBySymbol}
+          averageIndexTrendStats={averageIndexTrendStats}
           onFetchIndexData={handleFetchIndexData}
           loading={loading}
           stocksData={data}
@@ -101,6 +163,15 @@ export function StockCharts({
           indexNotice={indexNotice}
         />
       </div>
+
+      {retirementCoverage && (
+        <div className="mb-8">
+          <RetirementCoverageChart
+            result={retirementCoverage.result}
+            goalDate={retirementCoverage.goalDate}
+          />
+        </div>
+      )}
     </div>
   );
 }

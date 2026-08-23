@@ -80,6 +80,8 @@ Configuration (key/value pairs):
 investment_goal    1000000
 annual_growth_rate_near_term 0.10
 annual_growth_rate_long_term 0.07
+annual_inflation_rate 0.02
+effective_capital_income_tax_rate 0.323
 planned_monthly_contribution 500
 planned_monthly_contributions_until 2026-01-01
 ```
@@ -94,9 +96,24 @@ condition  explanation_short  explanation_long
 Data (header row plus entries):
 
 ```
-date        stocks_in_eur  event          category  status     duration  eunl_rate_to_trend
-2024-01-01  10000          Stock update   Finance   completed  1 day     1.02
+investment_date  stocks_in_eur  event          category  status     duration  eunl_rate_to_trend
+2024-01-01       10000          Stock update   Finance   completed  1 day     1.02
 ```
+
+`investment_date` is required for the investment timeline. The legacy `date`
+header is not accepted.
+
+After-goal monthly costs (header row plus entries, in current-year euros):
+
+```
+after_goal_monthly_category  after_goal_monthly_sum  after_goal_monthly_skip_inflation
+Housing                      1200
+Insurance                    100                     x
+```
+
+Cost amounts are entered in the current year's euros. Put `x` in the third
+column to keep a category's nominal amount unchanged instead of applying the
+configured inflation rate.
 
 ## Configuration
 

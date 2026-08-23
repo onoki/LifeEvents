@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { Event, Config, Condition, IndexDataPoint, MiniReward, TrendStats } from '../types';
+import type {
+  AfterGoalMonthlyCost,
+  Event,
+  Config,
+  Condition,
+  IndexDataPoint,
+  MiniReward,
+  TrendStats,
+} from '../types';
 import { parseExternalJson, type JsonPayloadValidator } from '../utils/external-api-utils';
 import { fetchConfiguredIndexApi, type IndexApiSeries } from '../utils/index-api-utils';
 import {
@@ -18,6 +26,7 @@ interface AppState {
   config: Config;
   conditions: Condition[];
   miniRewards: MiniReward[];
+  afterGoalMonthlyCosts: AfterGoalMonthlyCost[];
   indexDataBySymbol: Record<string, IndexDataPoint[]>;
   indexTrendStatsBySymbol: Record<string, TrendStats | null>;
   averageIndexTrendStats: TrendStats | null;
@@ -36,6 +45,7 @@ interface AppState {
   setConfig: (config: Config) => void;
   setConditions: (conditions: Condition[]) => void;
   setMiniRewards: (miniRewards: MiniReward[]) => void;
+  setAfterGoalMonthlyCosts: (costs: AfterGoalMonthlyCost[]) => void;
   setIndexDataBySymbol: (dataBySymbol: Record<string, IndexDataPoint[]>) => void;
   setIndexTrendStatsBySymbol: (statsBySymbol: Record<string, TrendStats | null>) => void;
   setAverageIndexTrendStats: (stats: TrendStats | null) => void;
@@ -56,6 +66,7 @@ const initialState = {
   config: {},
   conditions: [],
   miniRewards: [],
+  afterGoalMonthlyCosts: [],
   indexDataBySymbol: {},
   indexTrendStatsBySymbol: {},
   averageIndexTrendStats: null,
@@ -81,6 +92,7 @@ export const useAppStore = create<AppState>()(
       setConfig: (config) => set({ config }),
       setConditions: (conditions) => set({ conditions }),
       setMiniRewards: (miniRewards) => set({ miniRewards }),
+      setAfterGoalMonthlyCosts: (afterGoalMonthlyCosts) => set({ afterGoalMonthlyCosts }),
       setIndexDataBySymbol: (indexDataBySymbol) => set({ indexDataBySymbol }),
       setIndexTrendStatsBySymbol: (indexTrendStatsBySymbol) => set({ indexTrendStatsBySymbol }),
       setAverageIndexTrendStats: (averageIndexTrendStats) => set({ averageIndexTrendStats }),
@@ -99,7 +111,13 @@ export const useAppStore = create<AppState>()(
 
         try {
           const tsvData = await fetchTsvText(url);
-          const { config: parsedConfig, conditions: parsedConditions, data: parsedData, miniRewards: parsedMiniRewards } = parseTSVData(tsvData);
+          const {
+            config: parsedConfig,
+            conditions: parsedConditions,
+            data: parsedData,
+            miniRewards: parsedMiniRewards,
+            afterGoalMonthlyCosts: parsedAfterGoalMonthlyCosts,
+          } = parseTSVData(tsvData);
           
           if (parsedData.length === 0) {
             throw new Error(APP_CONFIG.ERRORS.NO_DATA);
@@ -109,8 +127,9 @@ export const useAppStore = create<AppState>()(
             config: parsedConfig, 
             conditions: parsedConditions, 
             miniRewards: parsedMiniRewards,
+            afterGoalMonthlyCosts: parsedAfterGoalMonthlyCosts,
             data: parsedData,
-            status: `Loaded ${parsedData.length} events, ${parsedConditions.length} conditions, and ${parsedMiniRewards.length} mini rewards successfully`
+            status: `Loaded ${parsedData.length} events, ${parsedConditions.length} conditions, ${parsedMiniRewards.length} mini rewards, and ${parsedAfterGoalMonthlyCosts.length} after-goal costs successfully`
           });
           
         } catch (err) {

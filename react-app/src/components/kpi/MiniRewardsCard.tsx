@@ -23,9 +23,9 @@ const daysBetween = (start: Date, end: Date): number =>
 const getLastDate = (data: Event[]): Date | null => {
   let latest: Date | null = null;
   data.forEach((item) => {
-    if (!item.date) return;
-    if (!latest || item.date.getTime() > latest.getTime()) {
-      latest = item.date;
+    if (!item.investment_date) return;
+    if (!latest || item.investment_date.getTime() > latest.getTime()) {
+      latest = item.investment_date;
     }
   });
   return latest;

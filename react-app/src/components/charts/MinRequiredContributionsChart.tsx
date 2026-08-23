@@ -64,8 +64,11 @@ const CONTRIBUTION_SCENARIOS: ScenarioDefinition[] = [
 const isSameMonth = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 
-const findDateLabelForMonth = (data: Array<{ date: Date; dateFormatted: string }>, target: Date): string | null => {
-  const exact = data.find((item) => isSameMonth(item.date, target));
+const findDateLabelForMonth = (
+  data: Array<{ investment_date: Date; dateFormatted: string }>,
+  target: Date
+): string | null => {
+  const exact = data.find((item) => isSameMonth(item.investment_date, target));
   return exact ? exact.dateFormatted : null;
 };
 
@@ -196,7 +199,9 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
         break;
       }
     }
-    const lastStockDataDate = lastStockDataIndex >= 0 ? data[lastStockDataIndex]?.date : data[0]?.date;
+    const lastStockDataDate = lastStockDataIndex >= 0
+      ? data[lastStockDataIndex]?.investment_date
+      : data[0]?.investment_date;
     
     // Create target line points only for the existing data range
     const enhancedData = data.map((item) => {
@@ -212,11 +217,11 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       
       // Split minRequiredContribution into area (with data) and line (projection)
       // Include transition point in line to avoid gap
-      if (item.date <= lastStockDataDate) {
+      if (item.investment_date <= lastStockDataDate) {
         // Up to and including last stock data: show as area
         minRequiredContributionArea = item.minRequiredContribution;
         // Include transition point in line for continuity
-        if (item.date.getTime() === lastStockDataDate.getTime()) {
+        if (item.investment_date.getTime() === lastStockDataDate.getTime()) {
           minRequiredContributionLine = item.minRequiredContribution;
         }
       } else {
@@ -227,11 +232,11 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       // Split minRequiredContributionAdjustedForEUNLTrend
       // Up to latest data: show as line (matching StockChart style)
       // After latest data: show as line (green)
-      if (item.date <= lastStockDataDate) {
+      if (item.investment_date <= lastStockDataDate) {
         // Up to and including last stock data: show as line (purple dashed, matching StockChart)
         minRequiredContributionAdjustedArea = item.minRequiredContributionAdjustedForEUNLTrend;
         // Include transition point in line for continuity
-        if (item.date.getTime() === lastStockDataDate.getTime()) {
+        if (item.investment_date.getTime() === lastStockDataDate.getTime()) {
           minRequiredContributionAdjustedLine = item.minRequiredContributionAdjustedForEUNLTrend;
         }
       } else {
@@ -301,10 +306,12 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       return [];
     }
 
-    const firstDate = fullDataSet[0]?.date;
-    const lastDate = fullDataSet[fullDataSet.length - 1]?.date;
+    const firstDate = fullDataSet[0]?.investment_date;
+    const lastDate = fullDataSet[fullDataSet.length - 1]?.investment_date;
     if (!firstDate || !lastDate) return [];
-    const plannedUntilIndex = fullDataSet.findIndex((item) => isSameMonth(item.date, plannedUntilDate));
+    const plannedUntilIndex = fullDataSet.findIndex((item) => (
+      isSameMonth(item.investment_date, plannedUntilDate)
+    ));
     if (plannedUntilIndex < 0) return [];
 
     const latestIndex = [...fullDataSet]
@@ -314,7 +321,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
 
     if (latestIndex < 0) return [];
     const latestPoint = fullDataSet[latestIndex];
-    const latestDate = latestPoint.date;
+    const latestDate = latestPoint.investment_date;
     if (isDateAfterMonth(latestDate, plannedUntilDate)) return [];
     if (plannedUntilIndex < latestIndex) return [];
 
@@ -358,7 +365,7 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
 
       const stepsToPlanned = plannedUntilIndex - latestIndex;
       for (let stepIndex = 1; stepIndex <= stepsToPlanned; stepIndex += 1) {
-        const stepDate = fullDataSet[latestIndex + stepIndex]?.date ?? plannedUntilDate;
+        const stepDate = fullDataSet[latestIndex + stepIndex]?.investment_date ?? plannedUntilDate;
         const appliesPlanned = isDateInOrBeforeMonth(stepDate, plannedUntilDate);
         const baseContribution = appliesPlanned ? plannedMonthlyContribution : 0;
         let contribution = monthlyContributionForScenario(scenario, stepIndex, baseContribution);

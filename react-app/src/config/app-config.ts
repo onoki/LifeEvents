@@ -106,6 +106,8 @@ export const APP_CONFIG = {
     INVESTMENT_GOAL: 1000000, // 1 million EUR
     ANNUAL_GROWTH_RATE_NEAR_TERM: 0.07, // 7%
     ANNUAL_GROWTH_RATE_LONG_TERM: 0.07, // 7%
+    ANNUAL_INFLATION_RATE: 0.02, // ECB medium-term target
+    EFFECTIVE_CAPITAL_INCOME_TAX_RATE: 0.323, // Simplified Finnish blended rate
   },
 
   // Error messages
