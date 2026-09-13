@@ -473,6 +473,31 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
       y: latestWithAdjusted.minRequiredContributionAdjustedArea as number
     };
   }, [chartData]);
+  const latestContributionSummary = React.useMemo(() => {
+    const latestRecordedPoint = [...data]
+      .reverse()
+      .find((item) => typeof item.stocks_in_eur === 'number'
+        && Number.isFinite(item.stocks_in_eur)
+        && item.stocks_in_eur > 0);
+    if (!latestRecordedPoint) return null;
+
+    const indexTrendContribution = latestRecordedPoint.minRequiredContributionAdjustedForEUNLTrend;
+    const minRequiredContribution = latestRecordedPoint.minRequiredContribution;
+    if (typeof indexTrendContribution !== 'number'
+      || !Number.isFinite(indexTrendContribution)
+      || typeof minRequiredContribution !== 'number'
+      || !Number.isFinite(minRequiredContribution)) {
+      return null;
+    }
+
+    return {
+      indexTrendContribution,
+      minRequiredContribution
+    };
+  }, [data]);
+  const formatLatestContribution = React.useCallback((value: number) => (
+    isPrivacyMode ? `${PRIVACY_VALUE_MASK} €` : formatCurrency(value)
+  ), [isPrivacyMode]);
 
   return (
     <div className="bg-card border border-gray-600 rounded-lg p-2 sm:p-6">
@@ -668,6 +693,37 @@ export function MinRequiredContributionsChart({ title, data, fullData, config }:
           />
         </AreaChart>
       </ResponsiveContainer>
+      {latestContributionSummary && (
+        <div
+          className="mt-2 text-sm"
+          data-testid="latest-contribution-summary"
+          aria-label="Latest contribution values"
+        >
+          <div className="text-xs font-medium text-muted-foreground">Latest recorded values</div>
+          <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:gap-x-6">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#8b5cf6]"
+                aria-hidden="true"
+              />
+              <span className="min-w-0">Contribution (index trend)</span>
+              <span className="ml-auto whitespace-nowrap font-semibold tabular-nums text-foreground sm:ml-1">
+                {formatLatestContribution(latestContributionSummary.indexTrendContribution)}
+              </span>
+            </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#3b82f6]"
+                aria-hidden="true"
+              />
+              <span className="min-w-0">Min required contribution</span>
+              <span className="ml-auto whitespace-nowrap font-semibold tabular-nums text-foreground sm:ml-1">
+                {formatLatestContribution(latestContributionSummary.minRequiredContribution)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       {orderedScenarioResults.length > 0 && plannedUntilX && (
         <div className="mt-3 text-xs text-muted-foreground">
           <div className="font-semibold text-foreground">

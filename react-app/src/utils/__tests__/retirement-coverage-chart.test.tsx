@@ -72,9 +72,14 @@ describe('RetirementCoverageChart', () => {
     expect(screen.getByTestId('coverage-axis-future')).toHaveTextContent(
       'Scale maximum 600 000 € (at-goal costs 2 050 €/month)'
     );
-    expect(screen.getByText(/Current savings at goal:/)).toHaveTextContent(
-      'Current savings at goal: 300 000 € (1 500 €/month after tax)'
+    expect(screen.getByText(/Current savings at goal date:/)).toHaveTextContent(
+      'Current savings at goal date: 300 000 € (1 500 €/month after tax)'
     );
+    expect(
+      screen.getByText(
+        'At investment goal date: Full cost coverage plus a 950 €/month buffer.'
+      )
+    ).toHaveAttribute('data-state', 'buffer');
     expect(screen.getByTestId('coverage-notes')).toHaveTextContent(
       'Coverage projects today’s estimated portfolio using long-term growth only; future contributions are not included.'
     );
@@ -156,7 +161,7 @@ describe('RetirementCoverageChart', () => {
     expect(firstCategory).toHaveStyle({ backgroundColor: 'rgb(251, 113, 133)' });
     expect(yellowCategory).toHaveStyle({ backgroundColor: 'rgb(234, 179, 8)' });
     expect(purpleCategory).toHaveStyle({ backgroundColor: 'rgb(139, 92, 246)' });
-    expect(finalCategory).toHaveStyle({ backgroundColor: 'rgba(15, 23, 42, 0.55)' });
+    expect(finalCategory).toHaveStyle({ backgroundColor: 'rgb(30, 41, 59)' });
     expect(container).not.toHaveTextContent('Category 1');
 
     fireEvent.mouseEnter(firstCategory);
@@ -191,7 +196,14 @@ describe('RetirementCoverageChart', () => {
     expect(screen.getByTestId('coverage-progress-future')).toHaveStyle({ width: '29.3%' });
 
     const row = screen.getByTestId('coverage-row-future');
-    expect(within(row).getByText('At investment goal: Gap 850 €/month')).toHaveAttribute('data-state', 'gap');
+    expect(
+      within(row).getByText(
+        'At investment goal date: 850 €/month less than full cost coverage.'
+      )
+    ).toHaveAttribute('data-state', 'gap');
+    expect(screen.getByTestId('coverage-visual-future')).toHaveAccessibleName(
+      'Retirement savings coverage. Monthly costs 2 050 €/month. Investment goal 240 000 €. Required savings 410 000 €. Current projected savings 120 000 €. At investment goal date: 850 €/month less than full cost coverage.'
+    );
     expect(within(row).queryByText('Current savings: Gap 1 450 €/month')).not.toBeInTheDocument();
   });
 
@@ -246,7 +258,7 @@ describe('RetirementCoverageChart', () => {
       .join(' ');
     expect(accessibleText).not.toMatch(/Private home|2047|100 000|120 000|240 000|410 000|850|0\.005/);
     expect(screen.getByTestId('coverage-visual-future')).toHaveAccessibleName(
-      'Retirement savings coverage. Cost category details are hidden. Investment goal, required savings, and current savings markers shown. Gap.'
+      `Retirement savings coverage. Cost category details are hidden. Investment goal, required savings, and current savings markers shown. At investment goal date: ${PRIVACY_VALUE_MASK} €/month less than full cost coverage.`
     );
   });
 

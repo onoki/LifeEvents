@@ -12,8 +12,8 @@ export interface RetirementCoverageChartProps {
 }
 
 // Existing project chart colors, arranged in rainbow order. If more categories
-// exist than unique hues, the final one becomes a dark translucent segment
-// instead of wrapping back to red/orange.
+// exist than unique hues, the final one uses the chart background color instead
+// of wrapping back to red/orange.
 const CATEGORY_COLORS = [
   '#fb7185',
   '#f97316',
@@ -25,7 +25,7 @@ const CATEGORY_COLORS = [
   '#3b82f6',
   '#8b5cf6',
 ];
-const FINAL_CATEGORY_COLOR = 'rgba(15, 23, 42, 0.55)';
+const FINAL_CATEGORY_COLOR = '#1e293b';
 
 const getCategoryColor = (index: number, categoryCount: number): string => {
   if (categoryCount > CATEGORY_COLORS.length && index === categoryCount - 1) {
@@ -50,6 +50,20 @@ const formatMonthly = (value: number, isPrivacyMode: boolean): string =>
 const formatMoney = (value: number, isPrivacyMode: boolean): string =>
   isPrivacyMode ? `${PRIVACY_VALUE_MASK} €` : formatCurrency(value);
 
+const formatCoverageComparison = (
+  context: string,
+  value: number,
+  isPrivacyMode: boolean
+): string => {
+  if (value > 0) {
+    return `${context}: Full cost coverage plus a ${formatMonthly(value, isPrivacyMode)} buffer.`;
+  }
+  if (value === 0) {
+    return `${context}: Full cost coverage.`;
+  }
+  return `${context}: ${formatMonthly(Math.abs(value), isPrivacyMode)} less than full cost coverage.`;
+};
+
 interface CoverageStatusProps {
   context: string;
   value: number;
@@ -62,6 +76,7 @@ function CoverageStatus({
   isPrivacyMode,
 }: CoverageStatusProps): React.JSX.Element {
   const isBuffer = value >= 0;
+  const status = formatCoverageComparison(context, value, isPrivacyMode);
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium ${
@@ -71,8 +86,7 @@ function CoverageStatus({
       }`}
       data-state={isBuffer ? 'buffer' : 'gap'}
     >
-      {context}: {isBuffer ? 'Buffer' : 'Gap'}
-      {!isPrivacyMode && ` ${formatMonthly(Math.abs(value), false)}`}
+      {status}
     </span>
   );
 }
@@ -206,10 +220,14 @@ function CoverageRow({
         ? requiredSavingsTooltip
         : visibleCategorySegments.find((segment) => segment.id === activeTooltipId)?.tooltip ?? null;
 
-  const stateWord = goalBufferOrGap >= 0 ? 'Buffer' : 'Gap';
+  const goalCoverageComparison = formatCoverageComparison(
+    'At investment goal date',
+    goalBufferOrGap,
+    isPrivacyMode
+  );
   const accessibleLabel = isPrivacyMode
-    ? `Retirement savings coverage. Cost category details are hidden. Investment goal, required savings, and current savings markers shown. ${stateWord}.`
-    : `Retirement savings coverage. Monthly costs ${formatMonthly(result.totalMonthlyCosts.future, false)}. Investment goal ${formatMoney(investmentGoal, false)}. Required savings ${requiredSavingsText}. Current projected savings ${formatMoney(projectedSavings, false)}. ${stateWord} ${formatMonthly(Math.abs(goalBufferOrGap), false)}.`;
+    ? `Retirement savings coverage. Cost category details are hidden. Investment goal, required savings, and current savings markers shown. ${goalCoverageComparison}`
+    : `Retirement savings coverage. Monthly costs ${formatMonthly(result.totalMonthlyCosts.future, false)}. Investment goal ${formatMoney(investmentGoal, false)}. Required savings ${requiredSavingsText}. Current projected savings ${formatMoney(projectedSavings, false)}. ${goalCoverageComparison}`;
 
   const showTooltip = (id: string): void => setActiveTooltipId(id);
   const hideTooltip = (id: string): void => {
@@ -223,7 +241,7 @@ function CoverageRow({
     >
       <div className="mb-2 flex min-w-0 text-xs text-cyan-200 sm:justify-end">
         <span className="text-left sm:text-right">
-          Current savings at goal: {formatMoney(result.todayEstimate.atGoal.future, isPrivacyMode)}{' '}
+          Current savings at goal date: {formatMoney(result.todayEstimate.atGoal.future, isPrivacyMode)}{' '}
           <span className="whitespace-nowrap">
             ({formatMonthly(result.existingSavingsMonthlyIncome.future, isPrivacyMode)} after tax)
           </span>
@@ -446,7 +464,7 @@ function CoverageRow({
 
       <div className="mt-1 flex flex-wrap gap-2">
         <CoverageStatus
-          context="At investment goal"
+          context="At investment goal date"
           value={goalBufferOrGap}
           isPrivacyMode={isPrivacyMode}
         />
