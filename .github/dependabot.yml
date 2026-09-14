@@ -7,13 +7,9 @@ updates:
       day: monday
       time: "05:00"
       timezone: Europe/Helsinki
-    open-pull-requests-limit: 5
-    # Tailwind major releases require coordinated PostCSS, CSS entry-point,
-    # plugin, and visual-regression changes; do not treat them as routine bumps.
-    ignore:
-      - dependency-name: tailwindcss
-        update-types:
-          - version-update:semver-major
+    # Disable routine version-update PRs. Dependabot security-update PRs are
+    # controlled separately and are not subject to this limit.
+    open-pull-requests-limit: 0
 
   - package-ecosystem: github-actions
     directory: /
@@ -22,4 +18,5 @@ updates:
       day: monday
       time: "05:15"
       timezone: Europe/Helsinki
-    open-pull-requests-limit: 5
+    # Disable routine GitHub Actions version-update PRs as well.
+    open-pull-requests-limit: 0
