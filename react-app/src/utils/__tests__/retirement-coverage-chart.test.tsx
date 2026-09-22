@@ -81,7 +81,7 @@ describe('RetirementCoverageChart', () => {
       )
     ).toHaveAttribute('data-state', 'buffer');
     expect(screen.getByTestId('coverage-notes')).toHaveTextContent(
-      'Coverage projects today’s estimated portfolio using long-term growth only; future contributions are not included.'
+      'Coverage projects today’s estimated portfolio using the configured near-term and long-term growth rates; future contributions are not included.'
     );
     expect(screen.getByTestId('coverage-notes')).toHaveTextContent(
       'Office, spa renovations and time with kids when young, are not included'

@@ -11,6 +11,7 @@ import { APP_CONFIG } from '../../config/app-config';
 import { calculateCurrentStockEstimate } from '../../utils/financial-utils';
 import { calculateRetirementCoverage } from '../../utils/retirement-coverage-utils';
 import { parseNumeric } from '../../utils/number-utils';
+import { parseLocalCalendarDate } from '../../utils/date-utils';
 import type { StockChartsProps } from '../../types';
 
 const parseConfigNumber = (value: string | undefined, fallback: number): number => {
@@ -79,6 +80,13 @@ export function StockCharts({
       config.annual_growth_rate_long_term,
       APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_LONG_TERM
     );
+    const annualGrowthRateNearTerm = parseConfigNumber(
+      config.annual_growth_rate_near_term,
+      APP_CONFIG.DEFAULTS.ANNUAL_GROWTH_RATE_NEAR_TERM
+    );
+    const plannedMonthlyContributionsUntil = config.planned_monthly_contributions_until
+      ? parseLocalCalendarDate(config.planned_monthly_contributions_until)
+      : null;
     const annualInflationRate = parseConfigNumber(
       config.annual_inflation_rate,
       APP_CONFIG.DEFAULTS.ANNUAL_INFLATION_RATE
@@ -99,7 +107,9 @@ export function StockCharts({
         goalDate,
         todayEstimate,
         investmentGoal,
+        annualGrowthRateNearTerm,
         annualGrowthRateLongTerm,
+        plannedMonthlyContributionsUntil,
         annualInflationRate,
         effectiveCapitalIncomeTaxRate,
         costs: afterGoalMonthlyCosts,

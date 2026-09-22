@@ -16,7 +16,9 @@ export interface RetirementCoverageInput {
   goalDate: Date;
   todayEstimate: number;
   investmentGoal: number;
+  annualGrowthRateNearTerm?: number;
   annualGrowthRateLongTerm: number;
+  plannedMonthlyContributionsUntil?: Date | null;
   annualInflationRate: number;
   effectiveCapitalIncomeTaxRate: number;
   costs: AfterGoalMonthlyCost[];
@@ -129,8 +131,10 @@ const safePower = (base: number, exponent: number): number => {
 
 /**
  * Models retirement cost coverage at the goal date. The existing portfolio is
- * grown using the long-term rate only and deliberately excludes all future
- * contributions. Capital-income tax applies to investment income, never costs.
+ * grown using the same configured rate schedule as the owned-stocks target:
+ * near-term through the cutoff month, then long-term from the following month.
+ * Future contributions are deliberately excluded. Capital-income tax applies
+ * to investment income, never costs.
  */
 export function calculateRetirementCoverage(
   input: RetirementCoverageInput
@@ -143,17 +147,40 @@ export function calculateRetirementCoverage(
 
   // A portfolio cannot lose more than its entire value in a year. Keeping the
   // lower bound at -100% also guarantees a positive monthly compounding base.
-  const annualGrowthRate = Math.max(-1, finiteOrZero(input.annualGrowthRateLongTerm));
+  const annualGrowthRateLongTerm = Math.max(
+    -1,
+    finiteOrZero(input.annualGrowthRateLongTerm)
+  );
+  const annualGrowthRateNearTerm = Math.max(
+    -1,
+    input.annualGrowthRateNearTerm === undefined
+      ? annualGrowthRateLongTerm
+      : finiteOrZero(input.annualGrowthRateNearTerm)
+  );
   // Inflation may be negative, but an annual price multiplier must stay above 0.
   const annualInflationRate = Math.max(-0.999999, finiteOrZero(input.annualInflationRate));
   const taxRate = clamp(input.effectiveCapitalIncomeTaxRate, 0, 1);
 
-  const investmentGrowthFactor = safePower(
-    1 + annualGrowthRate / 12,
-    projectionMonths
+  const cutoff = input.plannedMonthlyContributionsUntil;
+  const hasValidCutoff = cutoff instanceof Date && Number.isFinite(cutoff.getTime());
+  const longTermStarts = hasValidCutoff
+    ? new Date(cutoff.getFullYear(), cutoff.getMonth() + 1, 1)
+    : null;
+  let nearTermProjectionMonths = 0;
+  let longTermProjectionMonths = projectionMonths;
+  if (projectionMonths > 0 && longTermStarts && input.asOfDate < longTermStarts) {
+    const nearTermEnd = input.goalDate < longTermStarts
+      ? input.goalDate
+      : longTermStarts;
+    nearTermProjectionMonths = calculateProjectionMonths(input.asOfDate, nearTermEnd);
+    longTermProjectionMonths = Math.max(0, projectionMonths - nearTermProjectionMonths);
+  }
+  const investmentGrowthFactor = safeMultiply(
+    safePower(1 + annualGrowthRateNearTerm / 12, nearTermProjectionMonths),
+    safePower(1 + annualGrowthRateLongTerm / 12, longTermProjectionMonths)
   );
   const inflationFactor = safePower(1 + annualInflationRate, projectionYears);
-  const netMonthlyReturnRate = Math.max(0, annualGrowthRate / 12) * (1 - taxRate);
+  const netMonthlyReturnRate = Math.max(0, annualGrowthRateLongTerm / 12) * (1 - taxRate);
 
   const todayEstimate = nonNegativeFinite(input.todayEstimate);
   const investmentGoalFuture = nonNegativeFinite(input.investmentGoal);

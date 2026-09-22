@@ -33,6 +33,25 @@ describe('calculateRetirementCoverage', () => {
     );
   });
 
+  it('uses near-term growth through the cutoff month, then long-term growth', () => {
+    const result = calculateRetirementCoverage({
+      ...baseInput,
+      asOfDate: new Date(2026, 0, 1),
+      goalDate: new Date(2028, 0, 1),
+      annualGrowthRateNearTerm: 0.12,
+      annualGrowthRateLongTerm: 0.06,
+      plannedMonthlyContributionsUntil: new Date(2026, 11, 1),
+    });
+
+    const expectedGrowthFactor = Math.pow(1.01, 12) * Math.pow(1.005, 12);
+
+    expect(result.investmentGrowthFactor).toBeCloseTo(expectedGrowthFactor, 10);
+    expect(result.todayEstimate.atGoal.future).toBeCloseTo(
+      100_000 * expectedGrowthFactor,
+      6
+    );
+  });
+
   it('expresses future investment values and incomes in both money bases', () => {
     const result = calculateRetirementCoverage(baseInput);
     const inflationFactor = Math.pow(1.02, 10);

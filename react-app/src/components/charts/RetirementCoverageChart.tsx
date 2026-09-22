@@ -495,7 +495,7 @@ export function RetirementCoverageChart({
           data-testid="coverage-notes"
         >
           <p>
-            Coverage projects today’s estimated portfolio using long-term growth only; future contributions are not included.
+            Coverage projects today’s estimated portfolio using the configured near-term and long-term growth rates; future contributions are not included.
           </p>
           <p>
             {isPrivacyMode

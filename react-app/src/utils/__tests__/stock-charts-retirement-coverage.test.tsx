@@ -70,7 +70,9 @@ describe('StockCharts retirement coverage wiring', () => {
         data={data}
         config={{
           investment_goal: '200000',
+          annual_growth_rate_near_term: '0.24',
           annual_growth_rate_long_term: '0.12',
+          planned_monthly_contributions_until: '2026-12-01',
           annual_inflation_rate: '0',
           effective_capital_income_tax_rate: '0.25',
           planned_monthly_contribution: '99999',
@@ -89,7 +91,7 @@ describe('StockCharts retirement coverage wiring', () => {
     );
 
     const coverage = screen.getByTestId('wired-retirement-coverage');
-    const projectedBalance = 100_000 * Math.pow(1.01, 24);
+    const projectedBalance = 100_000 * Math.pow(1.02, 12) * Math.pow(1.01, 12);
 
     expect(calculateCurrentStockEstimate).toHaveBeenCalled();
     expect(coverage).toHaveAttribute('data-goal-date', '2028-01-01');
