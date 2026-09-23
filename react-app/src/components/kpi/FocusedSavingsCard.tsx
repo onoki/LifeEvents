@@ -105,8 +105,12 @@ export function FocusedSavingsCard({ config }: FocusedSavingsCardProps): React.J
         <div className="mt-auto pt-2">
           <div className="w-full bg-gray-600 rounded-lg h-7">
             <div
+              data-testid="focused-savings-progress-fill"
               className="bg-white h-7 rounded-lg transition-all duration-300"
-              style={{ width: `${progress}%` }}
+              style={{
+                width: `${progress}%`,
+                minWidth: progress > 0 ? '1.75rem' : undefined,
+              }}
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2 mb-1">

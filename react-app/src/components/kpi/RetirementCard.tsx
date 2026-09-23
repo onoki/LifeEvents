@@ -53,7 +53,10 @@ export function RetirementCard(): React.JSX.Element {
           <div className="w-full bg-gray-600 rounded-lg h-7">
             <div 
               className="bg-white h-7 rounded-lg transition-all duration-300" 
-              style={{ width: `${retirementProgress}%` }}
+              style={{
+                width: `${retirementProgress}%`,
+                minWidth: retirementProgress > 0 ? '1.75rem' : undefined,
+              }}
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2 mb-1">
