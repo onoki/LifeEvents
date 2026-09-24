@@ -51,16 +51,13 @@ export function RetirementCard(): React.JSX.Element {
         </div>
         <div className="mt-auto pt-2">
           <div
-            className="w-full bg-gray-600 rounded-lg h-7 flex items-center"
-            style={{ containerType: 'inline-size' }}
+            className="w-full bg-gray-600 rounded-lg h-7 overflow-hidden"
           >
             <div
-              className="bg-white rounded-full transition-all duration-300"
+              className="bg-white h-full transition-all duration-300"
               style={{
                 width: `${retirementProgress}%`,
-                height: retirementProgress > 0
-                  ? `min(1.75rem, max(2px, ${retirementProgress}cqw))`
-                  : 0,
+                borderRadius: 'inherit',
               }}
             />
           </div>

@@ -104,17 +104,15 @@ export function FocusedSavingsCard({ config }: FocusedSavingsCardProps): React.J
         </div>
         <div className="mt-auto pt-2">
           <div
-            className="w-full bg-gray-600 rounded-lg h-7 flex items-center"
-            style={{ containerType: 'inline-size' }}
+            data-testid="focused-savings-progress-track"
+            className="w-full bg-gray-600 rounded-lg h-7 overflow-hidden"
           >
             <div
               data-testid="focused-savings-progress-fill"
-              className="bg-white rounded-full transition-all duration-300"
+              className="bg-white h-full transition-all duration-300"
               style={{
                 width: `${progress}%`,
-                height: progress > 0
-                  ? `min(1.75rem, max(2px, ${progress}cqw))`
-                  : 0,
+                borderRadius: 'inherit',
               }}
             />
           </div>
