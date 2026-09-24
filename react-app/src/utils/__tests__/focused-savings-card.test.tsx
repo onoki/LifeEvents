@@ -19,7 +19,7 @@ describe('FocusedSavingsCard progress fill', () => {
     mockKpiCalculations.currentTime = new Date(2026, 8, 23);
   });
 
-  it('keeps a very small non-zero fill visibly rounded', () => {
+  it('keeps a very small non-zero fill proportional with fully rounded ends', () => {
     render(
       <FocusedSavingsCard
         config={{ planned_monthly_contributions_until: '2030-12-01' }}
@@ -29,8 +29,11 @@ describe('FocusedSavingsCard progress fill', () => {
     const fill = screen.getByTestId('focused-savings-progress-fill');
 
     expect(fill.style.width).toMatch(/^0\.[0-9]+%$/);
-    expect(fill).toHaveStyle({ minWidth: '1.75rem' });
-    expect(fill).toHaveClass('rounded-lg');
+    expect(fill.style.minWidth).toBe('');
+    expect(fill.style.height).toMatch(
+      /^min\(1\.75rem, max\(2px, 0\.[0-9]+cqw\)\)$/
+    );
+    expect(fill).toHaveClass('rounded-full');
   });
 
   it('does not display a minimum fill at zero progress', () => {
@@ -45,6 +48,7 @@ describe('FocusedSavingsCard progress fill', () => {
     const fill = screen.getByTestId('focused-savings-progress-fill');
 
     expect(fill).toHaveStyle({ width: '0%' });
+    expect(fill).toHaveStyle({ height: '0px' });
     expect(fill.style.minWidth).toBe('');
   });
 });
