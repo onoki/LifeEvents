@@ -8,7 +8,7 @@ describe('ViewModeToggle', () => {
     window.history.replaceState({}, '', '/');
   });
 
-  it('shows the four privacy-safe range labels and wraps them in a responsive grid', () => {
+  it('shows the five privacy-safe range labels and wraps them in a responsive grid', () => {
     const onViewModeChange = jest.fn();
     const { container } = render(
       <ViewModeToggle
@@ -20,11 +20,14 @@ describe('ViewModeToggle', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Recorded' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'This year plus half' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next 2 years' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Planned end plus 1 year' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Full range' })).toBeInTheDocument();
-    expect(container.querySelector('.grid-cols-2')).toHaveClass('sm:grid-cols-4');
+    expect(container.querySelector('.grid-cols-2')).toHaveClass('sm:grid-cols-5');
 
+    fireEvent.click(screen.getByRole('button', { name: 'This year plus half' }));
+    expect(onViewModeChange).toHaveBeenCalledWith('yearplushalf');
     fireEvent.click(screen.getByRole('button', { name: 'Planned end plus 1 year' }));
     expect(onViewModeChange).toHaveBeenCalledWith('planned');
   });
@@ -40,7 +43,7 @@ describe('ViewModeToggle', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Planned end plus 1 year' })).not.toBeInTheDocument();
-    expect(container.querySelector('.grid-cols-2')).toHaveClass('sm:grid-cols-3');
+    expect(container.querySelector('.grid-cols-2')).toHaveClass('sm:grid-cols-4');
   });
 
   it('does not expose the exact configured date in privacy mode', () => {

@@ -93,6 +93,8 @@ describe('RetirementCoverageChart', () => {
 
     const marker = screen.getByTestId('coverage-marker-future');
     expect(marker).not.toHaveAttribute('title');
+    expect(marker).toHaveClass('w-2');
+    expect(marker).not.toHaveClass('w-6');
     fireEvent.click(marker);
 
     const tooltip = screen.getByRole('tooltip');

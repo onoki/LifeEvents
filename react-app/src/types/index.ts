@@ -191,7 +191,7 @@ export interface YahooFinanceResponse {
 }
 
 // Utility types
-export type ViewMode = 'recorded' | 'next2years' | 'planned' | 'full';
+export type ViewMode = 'recorded' | 'yearplushalf' | 'next2years' | 'planned' | 'full';
 
 export interface MonthlyEventData {
   month: string;

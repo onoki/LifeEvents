@@ -55,6 +55,29 @@ describe('shared chart date ranges', () => {
     expect(filtered.some((item) => item.investment_date.getTime() === localDate(2022, 12, 1).getTime())).toBe(false);
   });
 
+  it('shows the previous 12 months and upcoming 6 months for This year plus half', () => {
+    const range = getChartDateRange(data, config, 'yearplushalf', now);
+
+    expect(range.min).toEqual(localDate(2025, 8, 16));
+    expect(range.max).toEqual(localDate(2027, 2, 16));
+
+    const boundaryData: Event[] = [
+      event(2025, 8, 15),
+      event(2025, 8, 16),
+      event(2026, 8, 16, 100),
+      event(2027, 2, 16),
+      event(2027, 2, 17),
+    ];
+    expect(
+      filterDataByViewMode(boundaryData, 'yearplushalf', config, now)
+        .map((item) => item.investment_date)
+    ).toEqual([
+      localDate(2025, 8, 16),
+      localDate(2026, 8, 16),
+      localDate(2027, 2, 16),
+    ]);
+  });
+
   it('ends the planned view one calendar year after the configured date', () => {
     const range = getChartDateRange(data, config, 'planned', now);
 
@@ -92,5 +115,9 @@ describe('shared chart date ranges', () => {
     const leapDayNow = localDate(2024, 2, 29);
 
     expect(getChartDateRange(data, config, 'next2years', leapDayNow).max).toEqual(localDate(2026, 2, 28));
+    expect(getChartDateRange(data, config, 'yearplushalf', leapDayNow)).toEqual({
+      min: localDate(2023, 2, 28),
+      max: localDate(2024, 8, 29),
+    });
   });
 });

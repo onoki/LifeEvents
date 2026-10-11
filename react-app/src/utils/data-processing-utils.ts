@@ -37,6 +37,19 @@ const addCalendarYears = (date: Date, years: number): Date => {
   );
 };
 
+/** Add calendar months while keeping end-of-month values within the target month. */
+const addCalendarMonths = (date: Date, months: number): Date => {
+  const absoluteMonth = date.getFullYear() * 12 + date.getMonth() + months;
+  const targetYear = Math.floor(absoluteMonth / 12);
+  const targetMonth = absoluteMonth - targetYear * 12;
+  const lastDayInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return new Date(
+    targetYear,
+    targetMonth,
+    Math.min(date.getDate(), lastDayInTargetMonth)
+  );
+};
+
 /**
  * Resolve the end of the planned-period view. A null value means that the
  * configured date is invalid, or that its one-year buffer does not reach
@@ -96,6 +109,14 @@ export function getChartDateRange(
 
   if (viewMode === 'recorded') {
     return { min, max: latestStockDate };
+  }
+
+  if (viewMode === 'yearplushalf') {
+    const today = startOfLocalDay(now);
+    return {
+      min: addCalendarMonths(today, -12),
+      max: addCalendarMonths(today, 6),
+    };
   }
 
   const defaultEnd = addCalendarYears(startOfLocalDay(now), 2);

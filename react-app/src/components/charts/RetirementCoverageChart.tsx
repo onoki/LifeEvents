@@ -385,7 +385,7 @@ function CoverageRow({
 
           <button
             type="button"
-            className="absolute bottom-0 top-0 z-40 w-6 -translate-x-1/2 cursor-pointer appearance-none border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-100"
+            className="absolute bottom-0 top-0 z-40 w-2 -translate-x-1/2 cursor-pointer appearance-none border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-100"
             data-testid="coverage-marker-future"
             style={{ left: `${progressWidth}%` }}
             aria-label={tooltipLabel(currentSavingsTooltip)}

@@ -24,6 +24,7 @@ export function ViewModeToggle({
     : false;
   const modes: Array<{ key: ViewMode; label: string }> = [
     { key: 'recorded', label: 'Recorded' },
+    { key: 'yearplushalf', label: 'This year plus half' },
     { key: 'next2years', label: 'Next 2 years' },
     ...(plannedRangeAvailable
       ? [{ key: 'planned' as const, label: 'Planned end plus 1 year' }]
@@ -37,7 +38,7 @@ export function ViewModeToggle({
   return (
     <div className="flex items-center justify-center">
       <div className="w-full max-w-3xl bg-card border border-gray-600 rounded-lg p-2 sm:p-4">
-        <div className={`grid grid-cols-2 gap-2 ${plannedRangeAvailable ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+        <div className={`grid grid-cols-2 gap-2 ${plannedRangeAvailable ? 'sm:grid-cols-5' : 'sm:grid-cols-4'}`}>
           {modes.map(({ key, label }) => (
             <button
               key={key}
