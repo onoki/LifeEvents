@@ -2,6 +2,12 @@
 
 These are project-wide invariants. Apply them to every relevant change unless the user explicitly requests different behavior.
 
+## Required verification
+
+- After every code or dependency change, run `npm run verify` from `react-app` before considering the work complete. This runs the production-dependency security audit, tests, lint, and the production build used by GitHub Actions.
+- Commit `react-app/package-lock.json` whenever dependency resolution changes; GitHub Actions installs exclusively with `npm ci`.
+- `npm run audit` is the blocking security gate for shipped dependencies. Use `npm run audit:all` when reviewing development-tool advisories as well, and assess those findings separately rather than applying breaking `npm audit fix --force` changes automatically.
+
 ## Privacy mode
 
 - `?privacy=true` (the **Hide exact values** feature) is a first-class display mode. Review every UI change in both normal and privacy modes.
