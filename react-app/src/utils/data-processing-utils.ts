@@ -198,6 +198,11 @@ const CONFIG_KEYS = new Set([
   'effective_capital_income_tax_rate',
   'planned_monthly_contribution',
   'planned_monthly_contributions_until',
+  'pension_known_date',
+  'pension_expected_start_date',
+  'pension_known_euros',
+  'pension_expected_annual_increase',
+  'pension_expected_tax_rate',
 ]);
 
 const hasExactHeaders = (cells: string[], headers: readonly string[]): boolean => (

@@ -39,6 +39,11 @@ export interface Config {
   effective_capital_income_tax_rate?: string;
   planned_monthly_contribution?: string;
   planned_monthly_contributions_until?: string;
+  pension_known_date?: string;
+  pension_expected_start_date?: string;
+  pension_known_euros?: string;
+  pension_expected_annual_increase?: string;
+  pension_expected_tax_rate?: string;
 }
 
 export interface ChartDataPoint {

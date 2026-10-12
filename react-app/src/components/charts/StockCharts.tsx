@@ -19,6 +19,12 @@ const parseConfigNumber = (value: string | undefined, fallback: number): number 
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const parseOptionalConfigNumber = (value: string | undefined): number | null => {
+  if (value === undefined || value.trim() === '') return null;
+  const parsed = parseNumeric(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 /**
  * Stock Charts Container Component
  * Displays stock-related charts with view mode controls
@@ -99,6 +105,28 @@ export function StockCharts({
       config.investment_goal,
       APP_CONFIG.DEFAULTS.INVESTMENT_GOAL
     );
+    const pensionKnownDate = config.pension_known_date
+      ? parseLocalCalendarDate(config.pension_known_date)
+      : null;
+    const pensionExpectedStartDate = config.pension_expected_start_date
+      ? parseLocalCalendarDate(config.pension_expected_start_date)
+      : null;
+    const pensionKnownMonthlyEuros = parseOptionalConfigNumber(config.pension_known_euros);
+    const pensionExpectedAnnualIncrease = parseOptionalConfigNumber(
+      config.pension_expected_annual_increase
+    );
+    const pensionExpectedTaxRate = parseOptionalConfigNumber(
+      config.pension_expected_tax_rate
+    );
+    const hasPensionConfiguration = (
+      pensionKnownDate !== null
+      && Number.isFinite(pensionKnownDate.getTime())
+      && pensionExpectedStartDate !== null
+      && Number.isFinite(pensionExpectedStartDate.getTime())
+      && pensionKnownMonthlyEuros !== null
+      && pensionExpectedAnnualIncrease !== null
+      && pensionExpectedTaxRate !== null
+    );
 
     return {
       goalDate,
@@ -113,6 +141,13 @@ export function StockCharts({
         annualInflationRate,
         effectiveCapitalIncomeTaxRate,
         costs: afterGoalMonthlyCosts,
+        pension: hasPensionConfiguration ? {
+          knownDate: pensionKnownDate,
+          expectedStartDate: pensionExpectedStartDate,
+          knownMonthlyEuros: pensionKnownMonthlyEuros,
+          expectedAnnualIncrease: pensionExpectedAnnualIncrease,
+          expectedTaxRate: pensionExpectedTaxRate,
+        } : undefined,
       }),
     };
   }, [afterGoalMonthlyCosts, config, currentTime, data, fullChartData]);

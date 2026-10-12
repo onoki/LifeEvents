@@ -108,6 +108,62 @@ describe('calculateRetirementCoverage', () => {
     expect(result.totalMonthlyCosts.future).toBeCloseTo(1_000 * inflationFactor + 500, 8);
   });
 
+  it('compares bridge-period cost inflation with pension at its expected start date', () => {
+    const result = calculateRetirementCoverage({
+      ...baseInput,
+      pension: {
+        knownDate: new Date(2026, 0, 1),
+        expectedStartDate: new Date(2046, 0, 1),
+        knownMonthlyEuros: 1_000,
+        expectedAnnualIncrease: 120,
+        expectedTaxRate: 0.25,
+      },
+    });
+    const goalInflationFactor = Math.pow(1.02, 10);
+    const bridgeInflationFactor = Math.pow(1.02, 10);
+    const expectedAccruedPension = 1_000 + 120 * 10;
+
+    expect(result.pensionBridge).toBeDefined();
+    expect(result.pensionBridge?.bridgeMonths).toBeCloseTo(120, 8);
+    expect(result.pensionBridge?.additionalMonthlyCostInflation).toBeCloseTo(
+      1_000 * goalInflationFactor * (bridgeInflationFactor - 1),
+      8
+    );
+    expect(result.pensionBridge?.projectedMonthlyPensionGross).toBeCloseTo(
+      expectedAccruedPension * Math.pow(1.02, 20),
+      8
+    );
+    expect(result.pensionBridge?.projectedMonthlyPensionNet).toBeCloseTo(
+      expectedAccruedPension * Math.pow(1.02, 20) * 0.75,
+      8
+    );
+    expect(result.pensionBridge?.totalMonthlyCostsAtPensionStart).toBeCloseTo(
+      1_000 * goalInflationFactor * bridgeInflationFactor + 500,
+      8
+    );
+    expect(result.pensionBridge?.monthlyBufferOrGapAtPensionStart).toBeCloseTo(
+      result.existingSavingsMonthlyIncome.future
+      + expectedAccruedPension * Math.pow(1.02, 20) * 0.75
+      - (1_000 * goalInflationFactor * bridgeInflationFactor + 500),
+      8
+    );
+  });
+
+  it('omits the pension comparison when pension does not start after the goal', () => {
+    const result = calculateRetirementCoverage({
+      ...baseInput,
+      pension: {
+        knownDate: new Date(2026, 0, 1),
+        expectedStartDate: new Date(2035, 0, 1),
+        knownMonthlyEuros: 1_000,
+        expectedAnnualIncrease: 120,
+        expectedTaxRate: 0.25,
+      },
+    });
+
+    expect(result.pensionBridge).toBeUndefined();
+  });
+
   it('derives the savings required to fund costs at the net monthly return', () => {
     const result = calculateRetirementCoverage(baseInput);
     const netMonthlyReturnRate = 0.12 / 12 * 0.7;

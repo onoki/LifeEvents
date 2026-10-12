@@ -11,6 +11,24 @@ export interface RetirementCoverageCategory {
   monthlyCost: RetirementCoverageMoneyValues;
 }
 
+export interface RetirementPensionInput {
+  knownDate: Date;
+  expectedStartDate: Date;
+  knownMonthlyEuros: number;
+  expectedAnnualIncrease: number;
+  expectedTaxRate: number;
+}
+
+export interface RetirementPensionBridgeResult {
+  expectedStartDate: Date;
+  bridgeMonths: number;
+  additionalMonthlyCostInflation: number;
+  projectedMonthlyPensionGross: number;
+  projectedMonthlyPensionNet: number;
+  totalMonthlyCostsAtPensionStart: number;
+  monthlyBufferOrGapAtPensionStart: number;
+}
+
 export interface RetirementCoverageInput {
   asOfDate: Date;
   goalDate: Date;
@@ -22,6 +40,7 @@ export interface RetirementCoverageInput {
   annualInflationRate: number;
   effectiveCapitalIncomeTaxRate: number;
   costs: AfterGoalMonthlyCost[];
+  pension?: RetirementPensionInput;
 }
 
 export interface RetirementCoverageResult {
@@ -43,6 +62,7 @@ export interface RetirementCoverageResult {
   totalMonthlyCosts: RetirementCoverageMoneyValues;
   existingSavingsBufferOrGap: RetirementCoverageMoneyValues;
   goalBufferOrGap: RetirementCoverageMoneyValues;
+  pensionBridge?: RetirementPensionBridgeResult;
 }
 
 const finiteOrZero = (value: number): number => Number.isFinite(value) ? value : 0;
@@ -229,6 +249,72 @@ export function calculateRetirementCoverage(
     future: goalMonthlyIncomeFuture,
   };
 
+  let pensionBridge: RetirementPensionBridgeResult | undefined;
+  const pension = input.pension;
+  if (
+    pension
+    && pension.knownDate instanceof Date
+    && Number.isFinite(pension.knownDate.getTime())
+    && pension.expectedStartDate instanceof Date
+    && Number.isFinite(pension.expectedStartDate.getTime())
+    && pension.expectedStartDate > input.goalDate
+  ) {
+    // Pension accrues only while work continues, through the LifeEvents goal.
+    // The agreed planning approximation then uses the configured inflation rate
+    // to express that accrued amount in pension-start nominal money.
+    const accrualMonths = calculateProjectionMonths(pension.knownDate, input.goalDate);
+    const pensionInflationMonths = calculateProjectionMonths(
+      pension.knownDate,
+      pension.expectedStartDate
+    );
+    const bridgeMonths = calculateProjectionMonths(input.goalDate, pension.expectedStartDate);
+    const bridgeInflationFactor = safePower(
+      1 + annualInflationRate,
+      bridgeMonths / 12
+    );
+    const pensionInflationFactor = safePower(
+      1 + annualInflationRate,
+      pensionInflationMonths / 12
+    );
+    const accruedMonthlyPension = saturateFinite(
+      nonNegativeFinite(pension.knownMonthlyEuros)
+      + nonNegativeFinite(pension.expectedAnnualIncrease) * accrualMonths / 12
+    );
+    const projectedMonthlyPensionGross = safeMultiply(
+      accruedMonthlyPension,
+      pensionInflationFactor
+    );
+    const projectedMonthlyPensionNet = safeMultiply(
+      projectedMonthlyPensionGross,
+      1 - clamp(pension.expectedTaxRate, 0, 1)
+    );
+    const additionalMonthlyCostInflation = safeSum(categories.map((category) => (
+      category.skipInflation
+        ? 0
+        : saturateFinite(
+          safeMultiply(category.monthlyCost.future, bridgeInflationFactor)
+          - category.monthlyCost.future
+        )
+    )));
+    const totalMonthlyCostsAtPensionStart = saturateFinite(
+      totalMonthlyCosts.future + additionalMonthlyCostInflation
+    );
+
+    pensionBridge = {
+      expectedStartDate: new Date(pension.expectedStartDate),
+      bridgeMonths,
+      additionalMonthlyCostInflation,
+      projectedMonthlyPensionGross,
+      projectedMonthlyPensionNet,
+      totalMonthlyCostsAtPensionStart,
+      monthlyBufferOrGapAtPensionStart: saturateFinite(
+        existingSavingsMonthlyIncome.future
+        + projectedMonthlyPensionNet
+        - totalMonthlyCostsAtPensionStart
+      ),
+    };
+  }
+
   return {
     asOfYear,
     projectionMonths,
@@ -262,5 +348,6 @@ export function calculateRetirementCoverage(
       currentYear: saturateFinite(goalMonthlyIncome.currentYear - totalMonthlyCosts.currentYear),
       future: saturateFinite(goalMonthlyIncome.future - totalMonthlyCosts.future),
     },
+    ...(pensionBridge ? { pensionBridge } : {}),
   };
 }

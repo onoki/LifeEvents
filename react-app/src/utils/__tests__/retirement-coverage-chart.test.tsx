@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { RetirementCoverageChart } from '../../components/charts/RetirementCoverageChart';
-import { PRIVACY_VALUE_MASK } from '../privacy-utils';
+import { PRIVACY_DATE_MASK, PRIVACY_VALUE_MASK } from '../privacy-utils';
 import type { RetirementCoverageResult } from '../retirement-coverage-utils';
 
 const GOAL_DATE = new Date(2047, 5, 30);
@@ -86,6 +86,31 @@ describe('RetirementCoverageChart', () => {
     expect(screen.getByTestId('coverage-notes')).toHaveTextContent(
       'Office, spa renovations and time with kids when young, are not included'
     );
+  });
+
+  it('shows inflation, net pension, and the pension-start monthly balance', () => {
+    const result = makeResult();
+    result.pensionBridge = {
+      expectedStartDate: new Date(2057, 9, 26),
+      bridgeMonths: 176.6,
+      additionalMonthlyCostInflation: 1285.65,
+      projectedMonthlyPensionGross: 6241.33,
+      projectedMonthlyPensionNet: 4556.17,
+      totalMonthlyCostsAtPensionStart: 3335.65,
+      monthlyBufferOrGapAtPensionStart: 2720.52,
+    };
+
+    render(<RetirementCoverageChart result={result} goalDate={GOAL_DATE} />);
+
+    const comparison = screen.getByTestId('coverage-pension-comparison');
+    expect(comparison).toHaveTextContent(
+      'Added monthly costs from inflation between goal date up to pension start date.'
+    );
+    expect(comparison).toHaveTextContent('+1 286 €/month');
+    expect(comparison).toHaveTextContent('Projected net pension at 26 Oct 2057');
+    expect(comparison).toHaveTextContent('4 556 €/month');
+    expect(comparison).toHaveTextContent('Additional monthly spending without reducing savings');
+    expect(comparison).toHaveTextContent('+2 721 €/month');
   });
 
   it('uses the requested year-based terminology in the current-savings tooltip', () => {
@@ -211,8 +236,18 @@ describe('RetirementCoverageChart', () => {
 
   it('masks compact values and every interactive tooltip in privacy mode', () => {
     window.history.replaceState({}, '', '/?privacy=true');
+    const result = makeGapResult();
+    result.pensionBridge = {
+      expectedStartDate: new Date(2057, 9, 26),
+      bridgeMonths: 176.6,
+      additionalMonthlyCostInflation: 1285.65,
+      projectedMonthlyPensionGross: 6241.33,
+      projectedMonthlyPensionNet: 4556.17,
+      totalMonthlyCostsAtPensionStart: 3335.65,
+      monthlyBufferOrGapAtPensionStart: 1820.52,
+    };
     const { container } = render(
-      <RetirementCoverageChart result={makeGapResult()} goalDate={GOAL_DATE} />
+      <RetirementCoverageChart result={result} goalDate={GOAL_DATE} />
     );
 
     expect(container).toHaveTextContent(PRIVACY_VALUE_MASK);
@@ -250,6 +285,11 @@ describe('RetirementCoverageChart', () => {
       '410 000 €',
       '850 €/month',
       'Office, spa renovations and time with kids when young, are not included',
+      '26 Oct 2057',
+      '1 286 €/month',
+      '6 241 €/month',
+      '4 556 €/month',
+      '1 821 €/month',
     ].forEach((privateText) => {
       expect(container).not.toHaveTextContent(privateText);
       expect(container.innerHTML).not.toContain(privateText);
@@ -258,7 +298,13 @@ describe('RetirementCoverageChart', () => {
     const accessibleText = Array.from(container.querySelectorAll('[aria-label], [title]'))
       .map((element) => `${element.getAttribute('aria-label') ?? ''} ${element.getAttribute('title') ?? ''}`)
       .join(' ');
-    expect(accessibleText).not.toMatch(/Private home|2047|100 000|120 000|240 000|410 000|850|0\.005/);
+    expect(accessibleText).not.toMatch(/Private home|2047|2057|100 000|120 000|240 000|410 000|850|1286|6241|0\.005/);
+    expect(screen.getByTestId('coverage-pension-comparison')).toHaveTextContent(
+      'Added monthly costs from inflation between goal date up to pension start date.'
+    );
+    expect(screen.getByTestId('coverage-pension-comparison')).toHaveTextContent(
+      `Projected net pension at ${PRIVACY_DATE_MASK}`
+    );
     expect(screen.getByTestId('coverage-visual-future')).toHaveAccessibleName(
       `Retirement savings coverage. Cost category details are hidden. Investment goal, required savings, and current savings markers shown. At investment goal date: ${PRIVACY_VALUE_MASK} €/month less than full cost coverage.`
     );

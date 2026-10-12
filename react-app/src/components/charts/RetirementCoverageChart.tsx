@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { usePrivacyMode } from '../../hooks/use-privacy-mode';
 import { formatCurrency } from '../../utils/financial-utils';
-import { PRIVACY_VALUE_MASK } from '../../utils/privacy-utils';
+import { PRIVACY_DATE_MASK, PRIVACY_VALUE_MASK } from '../../utils/privacy-utils';
 import type { RetirementCoverageResult } from '../../utils/retirement-coverage-utils';
 
 export interface RetirementCoverageChartProps {
@@ -49,6 +49,15 @@ const formatMonthly = (value: number, isPrivacyMode: boolean): string =>
 
 const formatMoney = (value: number, isPrivacyMode: boolean): string =>
   isPrivacyMode ? `${PRIVACY_VALUE_MASK} €` : formatCurrency(value);
+
+const formatDate = (date: Date, isPrivacyMode: boolean): string => {
+  if (isPrivacyMode) return PRIVACY_DATE_MASK;
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 const formatCoverageComparison = (
   context: string,
@@ -469,6 +478,67 @@ function CoverageRow({
           isPrivacyMode={isPrivacyMode}
         />
       </div>
+
+      {result.pensionBridge ? (
+        <div
+          className="mt-4 border-t border-border/70 pt-3"
+          data-testid="coverage-pension-comparison"
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-6">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Added monthly costs from inflation between goal date up to pension start date.
+              </p>
+              <p className="mt-1 text-lg font-semibold text-amber-200">
+                +{formatMonthly(
+                  result.pensionBridge.additionalMonthlyCostInflation,
+                  isPrivacyMode
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Projected net pension at {formatDate(
+                  result.pensionBridge.expectedStartDate,
+                  isPrivacyMode
+                )}
+              </p>
+              <p className="mt-1 text-lg font-semibold text-emerald-300">
+                {formatMonthly(
+                  result.pensionBridge.projectedMonthlyPensionNet,
+                  isPrivacyMode
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {result.pensionBridge.monthlyBufferOrGapAtPensionStart >= 0
+                  ? 'Additional monthly spending without reducing savings'
+                  : 'Monthly shortfall at pension start'}
+              </p>
+              <p
+                className={`mt-1 text-lg font-semibold ${
+                  result.pensionBridge.monthlyBufferOrGapAtPensionStart >= 0
+                    ? 'text-emerald-300'
+                    : 'text-rose-300'
+                }`}
+              >
+                {result.pensionBridge.monthlyBufferOrGapAtPensionStart >= 0 ? '+' : '−'}
+                {formatMonthly(
+                  Math.abs(result.pensionBridge.monthlyBufferOrGapAtPensionStart),
+                  isPrivacyMode
+                )}
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground sm:text-xs">
+            Future nominal amounts at pension start. Pension accrues through the goal date,
+            then the configured inflation and pension tax assumptions are applied. The monthly
+            balance includes goal-date net capital income and assumes the projected savings stay
+            unchanged until pension start.
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }

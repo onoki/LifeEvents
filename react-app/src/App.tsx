@@ -145,7 +145,7 @@ function App(): React.JSX.Element {
                   <div className="space-y-3">
                     <div>
                       <p className="font-medium">📋 Configuration Section:</p>
-                      <p className="font-mono text-xs ml-2">investment_goal, annual_growth_rate_near_term, annual_growth_rate_long_term, annual_inflation_rate, effective_capital_income_tax_rate</p>
+                      <p className="font-mono text-xs ml-2">investment_goal, annual_growth_rate_near_term, annual_growth_rate_long_term, annual_inflation_rate, effective_capital_income_tax_rate, pension_known_date, pension_expected_start_date, pension_known_euros, pension_expected_annual_increase, pension_expected_tax_rate</p>
                     </div>
                     
                     <div>

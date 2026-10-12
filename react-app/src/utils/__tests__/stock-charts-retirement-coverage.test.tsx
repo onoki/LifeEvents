@@ -42,6 +42,12 @@ jest.mock('../../components/charts/RetirementCoverageChart', () => ({
       existingSavingsMonthlyIncome: { future: number };
       goalMonthlyIncome: { future: number };
       totalMonthlyCosts: { future: number };
+      pensionBridge?: {
+        additionalMonthlyCostInflation: number;
+        projectedMonthlyPensionGross: number;
+        projectedMonthlyPensionNet: number;
+        monthlyBufferOrGapAtPensionStart: number;
+      };
     };
     goalDate: Date;
   }) => (
@@ -53,6 +59,10 @@ jest.mock('../../components/charts/RetirementCoverageChart', () => ({
       data-existing-income={result.existingSavingsMonthlyIncome.future}
       data-goal-income={result.goalMonthlyIncome.future}
       data-costs={result.totalMonthlyCosts.future}
+      data-pension-inflation={result.pensionBridge?.additionalMonthlyCostInflation}
+      data-pension-gross={result.pensionBridge?.projectedMonthlyPensionGross}
+      data-pension-net={result.pensionBridge?.projectedMonthlyPensionNet}
+      data-pension-balance={result.pensionBridge?.monthlyBufferOrGapAtPensionStart}
     />
   ),
 }));
@@ -76,6 +86,11 @@ describe('StockCharts retirement coverage wiring', () => {
           annual_inflation_rate: '0',
           effective_capital_income_tax_rate: '0.25',
           planned_monthly_contribution: '99999',
+          pension_known_date: '2026-01-01',
+          pension_expected_start_date: '2030-01-01',
+          pension_known_euros: '1000',
+          pension_expected_annual_increase: '120',
+          pension_expected_tax_rate: '0,25',
         }}
         conditions={[]}
         afterGoalMonthlyCosts={[
@@ -103,5 +118,12 @@ describe('StockCharts retirement coverage wiring', () => {
     );
     expect(Number(coverage.getAttribute('data-goal-income'))).toBe(1_500);
     expect(Number(coverage.getAttribute('data-costs'))).toBe(120);
+    expect(Number(coverage.getAttribute('data-pension-inflation'))).toBe(0);
+    expect(Number(coverage.getAttribute('data-pension-gross'))).toBe(1_240);
+    expect(Number(coverage.getAttribute('data-pension-net'))).toBe(930);
+    expect(Number(coverage.getAttribute('data-pension-balance'))).toBeCloseTo(
+      projectedBalance * 0.01 * 0.75 + 930 - 120,
+      6
+    );
   });
 });

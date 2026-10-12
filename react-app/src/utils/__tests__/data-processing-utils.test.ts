@@ -24,6 +24,11 @@ describe('spreadsheet section parsing', () => {
       '',
       'investment_goal\t1000000',
       'annual_inflation_rate\t0.02',
+      'pension_known_date\t2026-10-12',
+      'pension_expected_start_date\t2057-10-26',
+      'pension_known_euros\t1368',
+      'pension_expected_annual_increase\t123',
+      'pension_expected_tax_rate\t0,27',
     ].join('\r\n');
 
     const parsed = parseTSVData(tsv);
@@ -51,6 +56,11 @@ describe('spreadsheet section parsing', () => {
     expect(parsed.config).toEqual({
       investment_goal: '1000000',
       annual_inflation_rate: '0.02',
+      pension_known_date: '2026-10-12',
+      pension_expected_start_date: '2057-10-26',
+      pension_known_euros: '1368',
+      pension_expected_annual_increase: '123',
+      pension_expected_tax_rate: '0,27',
     });
   });
 
