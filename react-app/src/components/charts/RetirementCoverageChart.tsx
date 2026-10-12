@@ -245,7 +245,7 @@ function CoverageRow({
 
   return (
     <section
-      className="rounded-lg border border-border/70 bg-background/20 p-3 sm:p-4"
+      className="min-w-0"
       data-testid="coverage-row-future"
     >
       <div className="mb-2 flex min-w-0 text-xs text-cyan-200 sm:justify-end">

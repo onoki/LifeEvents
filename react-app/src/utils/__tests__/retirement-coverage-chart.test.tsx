@@ -64,6 +64,12 @@ describe('RetirementCoverageChart', () => {
     render(<RetirementCoverageChart result={makeResult()} goalDate={GOAL_DATE} />);
 
     expect(screen.getByText('Retirement monthly cost coverage')).toBeInTheDocument();
+    expect(screen.getByTestId('coverage-row-future')).toHaveClass('min-w-0');
+    expect(screen.getByTestId('coverage-row-future')).not.toHaveClass(
+      'rounded-lg',
+      'bg-background/20',
+      'p-3'
+    );
     expect(screen.queryByText('Today’s corrected estimate')).not.toBeInTheDocument();
     expect(screen.queryByText('Future nominal at 30 Jun 2047')).not.toBeInTheDocument();
     expect(screen.queryByText('After-tax monthly income')).not.toBeInTheDocument();
