@@ -213,8 +213,8 @@ export function StockChart({
   const plannedThenMinimumDescription = hasValidPlannedUntil
     ? `${plannedAmountLabel} through ${cutoffLabel} inclusive, then the recalculated minimum monthly amount until and including the goal month`
     : `${plannedAmountLabel} on every monthly step until and including the goal month`;
-  const plannedThenLatestMinimumDescription = hasValidPlannedUntil
-    ? `${plannedAmountLabel} through ${cutoffLabel} inclusive, then the same latest minimum monthly amount as Target (min contributions) until and including the goal month`
+  const plannedThenIndexMinimumDescription = hasValidPlannedUntil
+    ? `${plannedAmountLabel} through ${cutoffLabel} inclusive, then a constant minimum monthly amount recalculated from this scenario's projected balance using the same index growth rate until and including the goal month; zero if growth alone reaches the goal`
     : `${plannedAmountLabel} on every monthly step until and including the goal month`;
   const plannedContributionDescription = `Growth: ${configuredGrowthDescription}. Contributions: ${plannedThenMinimumDescription}. The path starts at the first portfolio value (index-adjusted when available).`;
   const legendItems = React.useMemo<LegendItem[]>(() => ([
@@ -268,7 +268,7 @@ export function StockChart({
     },
     {
       label: trendGrowthLabel,
-      description: `Growth: ${trendRateLabel || 'the fetched average historical index rate'} (the fetched historical-index average) for the full projection. Contributions: the same latest minimum monthly amount as Target (min contributions), added on every monthly step until and including the goal month.`,
+      description: `Growth: ${trendRateLabel || 'the fetched average historical index rate'} (the fetched historical-index average) for the full projection. Contributions: the minimum monthly amount is recalculated before each payment from this scenario's projected balance using the same index growth rate and remaining time to the goal; zero if growth alone reaches the goal.`,
       color: INDEX_MIN_COLOR,
       strokeDasharray: '5 5',
       variant: 'line',
@@ -276,7 +276,7 @@ export function StockChart({
     },
     {
       label: trendGrowthWithPlannedLabel,
-      description: `Growth: ${trendRateLabel || 'the fetched average historical index rate'} (the fetched historical-index average) for the full projection. Contributions: ${plannedThenLatestMinimumDescription}.`,
+      description: `Growth: ${trendRateLabel || 'the fetched average historical index rate'} (the fetched historical-index average) for the full projection. Contributions: ${plannedThenIndexMinimumDescription}.`,
       color: INDEX_PLANNED_COLOR,
       strokeDasharray: '2 4',
       variant: 'line',
@@ -306,7 +306,7 @@ export function StockChart({
     longTermGrowthRate,
     nearTermGrowthRate,
     plannedContributionDescription,
-    plannedThenLatestMinimumDescription,
+    plannedThenIndexMinimumDescription,
     trendGrowthLabel,
     trendGrowthWithPlannedLabel,
     trendRateLabel

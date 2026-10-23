@@ -295,13 +295,61 @@ describe('financial-utils', () => {
 
       // The configured rates are both 0%, so this verifies that the fetched 2%
       // monthly index trend remains active in March, after the February cutoff.
-      [100, 552, 1013.04].forEach((expected, index) => {
+      const indexMinimum = (1000 - 100 * Math.pow(1.02, 2)) / (1 + 1.02);
+      [100, 102 + indexMinimum, 1000].forEach((expected, index) => {
         expect(result[index].lineWithTrendGrowth).toBeCloseTo(expected, 6);
       });
-      // Planned contributions apply in February (the cutoff month); March uses
-      // the same minimum contribution as the index + min scenario.
-      [100, 112, 564.24].forEach((expected, index) => {
+      // February includes the final planned payment. March's contribution is
+      // solved from February's balance using the index rate, reaching the goal.
+      [100, 112, 1000].forEach((expected, index) => {
         expect(result[index].lineWithTrendGrowthAndPlannedContribution).toBeCloseTo(expected, 6);
+      });
+    });
+
+    it.each([0, 0.24, -0.12])('solves index + min using its own %p annual rate and the latest adjusted balance', (indexRate) => {
+      const monthlyRate = indexRate / 12;
+      const goal = 200 * Math.pow(1 + monthlyRate, 3)
+        + 5 * (1 + (1 + monthlyRate) + Math.pow(1 + monthlyRate, 2));
+      const events: Event[] = [
+        { investment_date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '50' },
+        { investment_date: parseLocalCalendarDate('2024-02-01'), stocks_in_eur: '100', eunl_rate_to_trend: '2' },
+        ...['2024-03-01', '2024-04-01', '2024-05-01'].map(date => ({
+          investment_date: parseLocalCalendarDate(date),
+        })),
+      ];
+      const result = calculateTargetWithFixedContribution(events, {
+        investment_goal: String(goal),
+        annual_growth_rate_near_term: '0.12',
+        annual_growth_rate_long_term: '0.06',
+        planned_monthly_contribution: '99',
+        planned_monthly_contributions_until: '2024-03-01',
+      }, indexRate);
+
+      expect(result[0].lineWithTrendGrowth).toBeNull();
+      expect(result[1].lineWithTrendGrowth).toBe(200);
+      for (let index = 2; index < result.length; index += 1) {
+        const previous = result[index - 1].lineWithTrendGrowth!;
+        const contribution = result[index].lineWithTrendGrowth! - previous * (1 + monthlyRate);
+        expect(contribution).toBeCloseTo(5, 8);
+      }
+      expect(result[result.length - 1].lineWithTrendGrowth).toBeCloseTo(goal, 8);
+    });
+
+    it.each([100, 100 * Math.pow(1.01, 2)])('sets index + min contributions to zero when growth alone covers the %p goal', (goal) => {
+      const events: Event[] = [
+        { investment_date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-02-01') },
+        { investment_date: parseLocalCalendarDate('2024-03-01') },
+      ];
+      const result = calculateTargetWithFixedContribution(events, {
+        investment_goal: String(goal),
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
+        planned_monthly_contributions_until: '2024-02-01',
+      }, 0.12);
+
+      [100, 101, 102.01].forEach((expected, index) => {
+        expect(result[index].lineWithTrendGrowth).toBeCloseTo(expected, 8);
       });
     });
 
@@ -323,8 +371,74 @@ describe('financial-utils', () => {
 
       // February is still part of the planned phase, even with a zero amount.
       // The minimum contribution starts in March, the month after the cutoff.
-      [100, 100, 200].forEach((expected, index) => {
+      [100, 100, 300].forEach((expected, index) => {
         expect(result[index].lineWithTrendGrowthAndPlannedContribution).toBeCloseTo(expected, 6);
+      });
+    });
+
+    it('recalculates a constant index contribution at the cutoff from the adjusted projected balance', () => {
+      const events: Event[] = [
+        { investment_date: parseLocalCalendarDate('2024-01-01'), stocks_in_eur: '100', eunl_rate_to_trend: '2' },
+        ...['2024-02-01', '2024-03-01', '2024-04-01', '2024-05-01'].map(date => ({
+          investment_date: parseLocalCalendarDate(date),
+        })),
+      ];
+      const cutoffBalance = 200 * 1.02 + 10;
+      const goal = cutoffBalance * Math.pow(1.02, 3) + 5 * (1 + 1.02 + Math.pow(1.02, 2));
+      const result = calculateTargetWithFixedContribution(events, {
+        investment_goal: String(goal),
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
+        planned_monthly_contribution: '10',
+        planned_monthly_contributions_until: '2024-02-15',
+      }, 0.24);
+
+      expect(result[0].lineWithTrendGrowthAndPlannedContribution).toBe(200);
+      expect(result[1].lineWithTrendGrowthAndPlannedContribution).toBe(cutoffBalance);
+      for (let index = 2; index < result.length; index += 1) {
+        const previous = result[index - 1].lineWithTrendGrowthAndPlannedContribution!;
+        expect(result[index].lineWithTrendGrowthAndPlannedContribution! - previous * 1.02)
+          .toBeCloseTo(5, 8);
+      }
+      expect(result[result.length - 1].lineWithTrendGrowthAndPlannedContribution).toBeCloseTo(goal, 8);
+    });
+
+    it('uses zero contributions without withdrawals when index growth alone exceeds the goal', () => {
+      const events: Event[] = [
+        { investment_date: parseLocalCalendarDate('2024-01-31'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-02-29') },
+        { investment_date: parseLocalCalendarDate('2024-03-31') },
+        { investment_date: parseLocalCalendarDate('2024-04-30') },
+      ];
+      const result = calculateTargetWithFixedContribution(events, {
+        investment_goal: '110',
+        annual_growth_rate_near_term: '0',
+        annual_growth_rate_long_term: '0',
+        planned_monthly_contribution: '10',
+        planned_monthly_contributions_until: '2024-02-01',
+      }, 0.12);
+
+      [100, 111, 112.11, 113.2311].forEach((expected, index) => {
+        expect(result[index].lineWithTrendGrowthAndPlannedContribution).toBeCloseTo(expected, 8);
+      });
+    });
+
+    it('solves the index minimum from the latest balance when the cutoff is already past', () => {
+      const events: Event[] = [
+        { investment_date: parseLocalCalendarDate('2024-03-01'), stocks_in_eur: '100' },
+        { investment_date: parseLocalCalendarDate('2024-04-01') },
+        { investment_date: parseLocalCalendarDate('2024-05-01') },
+      ];
+      const result = calculateTargetWithFixedContribution(events, {
+        investment_goal: '300',
+        annual_growth_rate_near_term: '0.12',
+        annual_growth_rate_long_term: '0.12',
+        planned_monthly_contribution: '10',
+        planned_monthly_contributions_until: '2024-02-01',
+      }, 0);
+
+      [100, 200, 300].forEach((expected, index) => {
+        expect(result[index].lineWithTrendGrowthAndPlannedContribution).toBeCloseTo(expected, 8);
       });
     });
 

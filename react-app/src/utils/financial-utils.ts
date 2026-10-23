@@ -134,10 +134,13 @@ export function calculateTargetWithFixedContribution(
     currentValue: number,
     goal: number,
     start: Date,
-    end: Date
+    end: Date,
+    monthlyRate?: number
   ): number => {
     const { growthFactor, contributionFactor } = calculateGrowthAndContributionFactors(
-      getMonthlyRatesBetween(start, end, config)
+      monthlyRate === undefined
+        ? getMonthlyRatesBetween(start, end, config)
+        : Array.from({ length: Math.max(0, monthsBetween(start, end)) }, () => monthlyRate)
     );
     if (contributionFactor === 0) return 0;
     return (goal - currentValue * growthFactor) / contributionFactor;
@@ -208,6 +211,7 @@ export function calculateTargetWithFixedContribution(
     plusOnePercentLine: 0,
     trendGrowthLine: 0,
     trendGrowthWithPlannedContributionLine: 0,
+    trendPlannedMinimumContribution: null as number | null,
     plannedContributionLine: firstAdjustedValue,
     plannedProjectionValue: firstAdjustedValue,
     plannedMinRequired: 0,
@@ -332,14 +336,33 @@ export function calculateTargetWithFixedContribution(
       lineWithPlusOnePercentGrowth = projectionState.plusOnePercentLine * (1 + monthlyRatePlusOne) + effectiveMinContribution;
       
       if (hasTrendGrowth) {
-        lineWithTrendGrowth = projectionState.trendGrowthLine * (1 + monthlyTrendRate) + effectiveMinContribution;
+        const trendMinimumContribution = Math.max(0, calculateMinRequiredContribution(
+          projectionState.trendGrowthLine,
+          investmentGoal,
+          sortedData[index - 1].investment_date,
+          lastDate,
+          monthlyTrendRate
+        ));
+        lineWithTrendGrowth = projectionState.trendGrowthLine * (1 + monthlyTrendRate)
+          + trendMinimumContribution;
         const isAfterPlannedCutoff = hasValidPlannedUntil
           && isDateAfterMonth(item.investment_date, plannedUntilDate!);
         const plannedContributionBeforeCutoff = plannedMonthlyContribution > 0
           ? plannedMonthlyContribution
           : 0;
+        if (isAfterPlannedCutoff && projectionState.trendPlannedMinimumContribution === null) {
+          // Solve from this scenario's balance after the final planned payment.
+          // Include the current month in the remaining contribution payments.
+          projectionState.trendPlannedMinimumContribution = Math.max(0, calculateMinRequiredContribution(
+            projectionState.trendGrowthWithPlannedContributionLine,
+            investmentGoal,
+            sortedData[index - 1].investment_date,
+            lastDate,
+            monthlyTrendRate
+          ));
+        }
         const plannedContributionForTrend = isAfterPlannedCutoff
-          ? effectiveMinContribution
+          ? projectionState.trendPlannedMinimumContribution ?? 0
           : plannedContributionBeforeCutoff;
         lineWithTrendGrowthAndPlannedContribution =
           projectionState.trendGrowthWithPlannedContributionLine * (1 + monthlyTrendRate) + plannedContributionForTrend;

@@ -20,7 +20,8 @@ These are project-wide invariants. Apply them to every relevant change unless th
 
 - The near-term annual growth rate applies through and including `planned_monthly_contributions_until`. The long-term rate starts in the following month.
 - Fetched historical-index growth scenarios use their fetched average rate for the full projection horizon.
-- The index + planned scenario uses planned contributions through the cutoff month inclusive, then the same latest minimum contribution used by the index + min scenario.
+- The index + min scenario recalculates its minimum contribution before each monthly payment using its own projected balance, fetched index growth rate, and remaining goal horizon. Contributions must never be negative and are zero when growth alone reaches or exceeds the goal.
+- The index + planned scenario uses planned contributions through the cutoff month inclusive, then a constant minimum contribution recalculated from its projected balance at that point using the fetched index growth rate for the remaining horizon. Clamp that contribution to zero when growth alone reaches or exceeds the goal; never use negative contributions.
 - Add or update regression tests whenever projection timing, rates, or contribution rules change.
 
 ## Chart consistency
